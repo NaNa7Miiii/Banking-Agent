@@ -1,6 +1,6 @@
 # Banking Agent
 
-A conversational AI agent system for banking operations, built with LangChain and LangGraph. The system provides intelligent query routing, SQL database access, RAG (Retrieval-Augmented Generation), web search, and fraud detection capabilities.
+A conversational AI agent system for banking operations, built with LangChain and LangGraph. The system provides intelligent query routing, SQL database access, RAG, web search, and fraud detection capabilities.
 
 ## Features
 
