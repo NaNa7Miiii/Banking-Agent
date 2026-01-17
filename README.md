@@ -117,11 +117,6 @@ PINECONE_API_KEY=your-pinecone-api-key
 TAVILY_SEARCH_KEY=your-tavily-api-key
 ```
 
-**Note**: 
-- Copy `.env.example` (if available) and fill in your actual values
-- Never commit `.env` to git - it's already in `.gitignore`
-- Sensitive fields (`DB_HOST`, `DB_PASSWORD`) must be set via environment variables
-
 ## Usage
 
 ### Basic Chat Interface
