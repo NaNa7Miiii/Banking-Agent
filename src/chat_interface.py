@@ -11,21 +11,11 @@ from src.graph.modules.sql_agent import create_transaction_sql_agent_node
 from src.graph.modules.rag_agent import create_rag_agent_node
 from src.graph.modules.tavily_agent import create_tavily_agent_node
 from src.graph.modules.fraud_agent import create_transaction_fraud_agent_node
+from src.config import get_db_config
 from pinecone import Pinecone
 from tavily import TavilyClient
 import os
 import json
-
-
-# Database configuration (hardcoded for now)
-DB_CONFIG = {
-    "username": "postgres",
-    "password": "7!>SPVSmOm<Zqej7Pvb9-w|8k4-e",
-    "host": "customer-transaction-db.cjk2suky8cot.us-west-2.rds.amazonaws.com",
-    "port": 5432,
-    "database": "customer_transaction_db",
-    "table_name": "transactions",
-}
 
 _graph_cache = None
 
@@ -37,14 +27,17 @@ def create_graph():
     if _graph_cache is not None:
         return _graph_cache
 
+    # Get database configuration from environment variables
+    db_config = get_db_config()
+
     # Create graph components
     sql_agent_node = create_transaction_sql_agent_node(
-        username=DB_CONFIG["username"],
-        password=DB_CONFIG["password"],
-        host=DB_CONFIG["host"],
-        port=DB_CONFIG["port"],
-        database=DB_CONFIG["database"],
-        table_name=DB_CONFIG["table_name"],
+        username=db_config["username"],
+        password=db_config["password"],
+        host=db_config["host"],
+        port=db_config["port"],
+        database=db_config["database"],
+        table_name=db_config["table_name"],
     )
 
     # Initialize Pinecone client for RAG agent
@@ -65,12 +58,12 @@ def create_graph():
 
     # Initialize fraud agent
     fraud_agent_node = create_transaction_fraud_agent_node(
-        username=DB_CONFIG["username"],
-        password=DB_CONFIG["password"],
-        host=DB_CONFIG["host"],
-        port=DB_CONFIG["port"],
-        database=DB_CONFIG["database"],
-        table_name=DB_CONFIG["table_name"],
+        username=db_config["username"],
+        password=db_config["password"],
+        host=db_config["host"],
+        port=db_config["port"],
+        database=db_config["database"],
+        table_name=db_config["table_name"],
     )
 
     # Create and cache graph
