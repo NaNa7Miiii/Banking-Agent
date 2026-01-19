@@ -1,6 +1,6 @@
 # Banking Agent
 
-A conversational AI agent system for banking operations, built with LangChain and LangGraph. The system provides intelligent query routing, SQL database access, RAG (Retrieval-Augmented Generation), web search, and fraud detection capabilities.
+A conversational AI agent system for banking operations, built with LangChain and LangGraph. The system provides intelligent query routing, SQL database access, RAG, web search, and fraud detection capabilities.
 
 ## Features
 
@@ -117,11 +117,6 @@ PINECONE_API_KEY=your-pinecone-api-key
 TAVILY_SEARCH_KEY=your-tavily-api-key
 ```
 
-**Note**: 
-- Copy `.env.example` (if available) and fill in your actual values
-- Never commit `.env` to git - it's already in `.gitignore`
-- Sensitive fields (`DB_HOST`, `DB_PASSWORD`) must be set via environment variables
-
 ## Usage
 
 ### Basic Chat Interface
@@ -182,55 +177,3 @@ agent_bank/
 3. **RAG Agent**: Searches knowledge base using vector similarity
 4. **Tavily Agent**: Performs web searches for real-time information
 5. **Fraud Agent**: Detects potentially fraudulent transactions
-
-## Development
-
-### Running Tests
-
-(Add test instructions here when tests are available)
-
-### Code Structure
-
-- Configuration is managed through environment variables (see `src/config.py`)
-- Database connections use SQLAlchemy
-- Conversation memory is stored in Redis
-- LangGraph orchestrates the agent workflow
-
-## Troubleshooting
-
-### Redis Connection Issues
-
-If you encounter Redis connection errors:
-
-1. **Check if Redis container is running**:
-   ```bash
-   docker ps | grep redis
-   ```
-
-2. **Check Redis logs**:
-   ```bash
-   docker logs redis-banking-agent
-   ```
-
-3. **Verify Redis is accessible**:
-   ```bash
-   docker exec -it redis-banking-agent redis-cli ping
-   ```
-
-### Database Connection Issues
-
-- Verify `.env` file has correct `DB_HOST` and `DB_PASSWORD`
-- Check database network accessibility
-- Ensure database credentials are correct
-
-### Missing API Keys
-
-Some features require API keys (Pinecone, Tavily). If not provided, those agents will be disabled but the system will still function with other agents.
-
-## License
-
-(Add license information here)
-
-## Contributing
-
-(Add contribution guidelines here)
