@@ -3,7 +3,7 @@ from typing import TypedDict, List, Any, Optional
 from langchain_core.output_parsers import StrOutputParser
 from langchain_classic.memory.summary_buffer import ConversationSummaryBufferMemory
 
-from src.graph.models.llm import LLM
+from src.graph.models.llm import get_llm
 from src.graph.prompts.router_prompts import ROUTER_SYSTEM_PROMPT
 from src.graph.prompts.summary_prompts import SUMMARY_SYSTEM_PROMPT, create_summary_user_prompt
 from src.graph.utils.memory import create_memory
@@ -56,7 +56,9 @@ def route_query(user_query: str, memory: Optional[ConversationSummaryBufferMemor
     # Build user prompt with conversation history if available
     user_prompt = format_conversation_history(memory, user_query, max_messages=10)
 
-    raw_output = LLM.chat(
+    # Get LLM instance for router role
+    llm = get_llm(role="router")
+    raw_output = llm.chat(
         system_prompt=ROUTER_SYSTEM_PROMPT,
         user_prompt=user_prompt,
         response_format=None,
@@ -92,7 +94,10 @@ def create_router_node():
         customer_id_number = state.get("customer_id_number", "")
         session_id = state.get("session_id", "")
 
+        print(f"\n[Router] Starting routing for user input: {user_input}")
+
         if not user_input:
+            print("[Router] WARNING: Empty user input received.")
             return {**state, "queries": [], "current_query_index": 0}
 
         # Load memory for this session
@@ -104,6 +109,10 @@ def create_router_node():
 
         # Route the query with conversation history
         router_output = route_query(user_input, memory=memory)
+
+        print(f"[Router] Routing completed. Found {len(router_output['queries'])} sub-queries:")
+        for q in router_output["queries"]:
+            print(f"  - {q['id']}: {q['original_text']} (Intent: {q['primary_intent']})")
 
         return {
             **state,
@@ -158,6 +167,8 @@ def create_query_processor_node(agent_map: dict):
             )
 
             # Process with the appropriate agent
+            print(f"\n[Router] Processing query with {primary_intent} agent...")
+            print(f"[Router] Query: {current_query['original_text']}")
             agent_state = agent_node({"question": question})
             result = {
                 "query_id": current_query["id"],
@@ -166,6 +177,7 @@ def create_query_processor_node(agent_map: dict):
                 "answer": agent_state.get("answer", ""),
                 "details": agent_state,
             }
+            print(f"[Router] Agent processing completed for {primary_intent}.")
 
         # Add result and move to next query
         updated_results = results + [result]
@@ -241,7 +253,8 @@ def create_summary_node():
         # Generate summary using LLM
         summary_prompt = create_summary_user_prompt(answers_text)
 
-        summary = LLM.chat(
+        llm = get_llm(role="summary")
+        summary = llm.chat(
             system_prompt=SUMMARY_SYSTEM_PROMPT,
             user_prompt=summary_prompt,
             response_format=None,
