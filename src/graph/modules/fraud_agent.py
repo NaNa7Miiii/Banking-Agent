@@ -1,11 +1,19 @@
-from typing import TypedDict, List, Dict, Any, Optional
-from sqlalchemy import text
 import json
+from typing import TypedDict, List, Dict, Any, Optional
 from pathlib import Path
+from sqlalchemy import text
 from src.data.model.predictor import get_fraud_predictor
 from src.graph.models.llm import get_llm
-from src.graph.prompts.fraud_prompts import FRAUD_LLM_SYSTEM_PROMPT, FRAUD_ANALYSIS_USER_PROMPT
 from src.graph.modules.sql_agent import SQLAgent
+from src.graph.utils.fraud_utils import (
+    extract_transaction_id_from_question,
+    fetch_transaction_by_id,
+    get_llm_analysis_for_transaction,
+    format_llm_explanation_report,
+    extract_time_window_from_transactions,
+    format_fraud_detection_report,
+    format_no_fraud_report,
+)
 
 
 # Fraud agent state definition
@@ -23,10 +31,9 @@ class FraudAgentState(TypedDict):
     time_window_start: str  # Start date of time window
     time_window_end: str  # End date of time window
 
-# This agent performs a two-stage fraud detection:
-#    1. First stage: Use XGBoost model to filter transactions (ignore if < threshold)
-#    2. Second stage: For transactions >= threshold, use LLM for final determination
-# If question is provided, it will use SQLAgent to generate SQL and fetch transactions from DB
+# This agent handles two main functions:
+#    1. Single transaction detection: SQL (fetch metadata) → XGBoost → LLM → Output explanation
+#    2. Time window detection: SQL (fetch transactions) → XGBoost → Output flagged transaction IDs
 def create_fraud_agent_node(
     sql_agent: Optional[SQLAgent] = None,
     llm_model="gpt-4.1",
@@ -81,98 +88,150 @@ def create_fraud_agent_node(
         temperature=temperature,
     )
 
-    def fraud_agent_node(state: Dict[str, Any]) -> Dict[str, Any]:
-        # Adapt to router interface: accept state with 'question' key, return state with 'answer' key
-        question = state.get("question", "")
-        transactions = state.get("transactions", [])
-        sql_query = state.get("sql_query", "")
-        sql_result = state.get("sql_result", None)
+    def _handle_single_transaction_detection(
+        state: Dict[str, Any],
+        transaction_id: str,
+        sql_agent: SQLAgent,
+        predictor,
+        llm
+    ) -> Dict[str, Any]:
+        """Handle single transaction detection: SQL → XGBoost → LLM → Output explanation."""
+        print(f"\n[Fraud Agent] Single transaction detection for ID: {transaction_id}")
 
-        time_window_start = ""
-        time_window_end = ""
+        # Step 1: SQL agent - Fetch transaction metadata
+        print("[Fraud Agent] Step 1: Fetching transaction metadata from database...")
+        transaction = fetch_transaction_by_id(sql_agent, transaction_id)
+        if not transaction:
+            return {
+                **state,
+                "answer": f"Transaction ID '{transaction_id}' not found in the database.",
+                "llm_analysis": "",
+                "llm_analysis_json": [],
+                "final_fraud_report": f"Transaction ID '{transaction_id}' not found.",
+            }
 
-        # If question is provided but no transactions, use SQLAgent to fetch transactions
-        if question and not transactions and sql_agent:
-            try:
-                # Generate SQL query from question
-                sql_query = sql_agent.generate_sql(question)
+        # Step 2: XGBoost prediction
+        print("[Fraud Agent] Step 2: Running XGBoost model for fraud prediction...")
+        fraud_prediction = predictor.predict(transaction)
+        fraud_prob = fraud_prediction.get("fraud_probability", 0.0)
+        confidence = fraud_prediction.get("confidence", "unknown")
+        print(f"[Fraud Agent] XGBoost prediction: fraud_probability={fraud_prob:.4f}, confidence={confidence}")
 
-                # Execute SQL query and get results as dictionaries
-                # Use SQLAlchemy engine directly to get dict results
-                with sql_agent.db._engine.connect() as conn:
-                    result = conn.execute(text(sql_query))
-                    # Convert to list of dictionaries
-                    transactions = [dict(row._mapping) for row in result]
-                    sql_result = transactions
+        # Step 3: LLM analysis
+        print("[Fraud Agent] Step 3: Requesting LLM explanation...")
+        llm_analysis_raw, llm_analysis_json = get_llm_analysis_for_transaction(
+            llm, transaction, fraud_prob, confidence
+        )
+        print("[Fraud Agent] LLM explanation received.")
 
-                if not transactions:
-                    return {
-                        **state,
-                        "sql_query": sql_query,
-                        "sql_result": sql_result,
-                        "transactions": [],
-                        "fraud_predictions": [],
-                        "flagged_transactions": [],
-                        "llm_analysis": "No transactions found matching the query criteria.",
-                        "llm_analysis_json": [],
-                        "final_fraud_report": f"No transactions found matching the query criteria.\n\nSQL Query: {sql_query}",
-                        "answer": "No transactions found matching the query criteria.",
-                        "time_window_start": time_window_start,
-                        "time_window_end": time_window_end,
-                    }
-            except Exception as e:
+        # Format explanation report
+        answer = format_llm_explanation_report(
+            transaction_id, transaction, fraud_prob, confidence,
+            llm_analysis_json, llm_analysis_raw
+        )
+
+        time_window_start, time_window_end = extract_time_window_from_transactions([transaction])
+
+        return {
+            **state,
+            "transactions": [transaction],
+            "fraud_predictions": [fraud_prediction],
+            "flagged_transactions": [{
+                "transaction": transaction,
+                "fraud_probability": fraud_prob,
+                "confidence": confidence,
+                "ml_is_fraud": fraud_prediction.get("is_fraud", False),
+            }],
+            "llm_analysis": llm_analysis_raw,
+            "llm_analysis_json": llm_analysis_json,
+            "final_fraud_report": answer,
+            "answer": answer,
+            "time_window_start": time_window_start,
+            "time_window_end": time_window_end,
+        }
+
+    def _handle_time_window_detection(
+        state: Dict[str, Any],
+        question: str,
+        sql_agent: SQLAgent,
+        predictor
+    ) -> Dict[str, Any]:
+        """Handle time window fraud detection: SQL → XGBoost → Output flagged transaction IDs."""
+        try:
+            print(f"\n[Fraud Agent] Time window detection: Generating SQL query from question: {question}")
+            sql_query = sql_agent.generate_sql(question)
+            print(f"[Fraud Agent] SQL Query: {sql_query}")
+
+            print("[Fraud Agent] Executing SQL query...")
+            with sql_agent.db._engine.connect() as conn:
+                result = conn.execute(text(sql_query))
+                transactions = [dict(row._mapping) for row in result]
+                sql_result = transactions
+            print(f"[Fraud Agent] SQL query executed. Retrieved {len(transactions)} transactions.")
+
+            if not transactions:
                 return {
                     **state,
                     "sql_query": sql_query,
-                    "sql_result": None,
+                    "sql_result": sql_result,
                     "transactions": [],
                     "fraud_predictions": [],
                     "flagged_transactions": [],
-                    "llm_analysis": f"Error fetching transactions from database: {str(e)}",
+                    "llm_analysis": "",
                     "llm_analysis_json": [],
-                    "final_fraud_report": f"Error fetching transactions from database: {str(e)}\n\nSQL Query: {sql_query if sql_query else 'N/A'}",
-                    "answer": f"Error fetching transactions from database: {str(e)}",
-                    "time_window_start": time_window_start,
-                    "time_window_end": time_window_end,
+                    "final_fraud_report": "No transactions found matching the query criteria.",
+                    "answer": "No transactions found matching the query criteria.",
+                    "time_window_start": "",
+                    "time_window_end": "",
                 }
 
-        if not transactions:
+            # Run XGBoost detection and output flagged transaction IDs
+            return _handle_batch_fraud_detection(
+                state, transactions, sql_query, sql_result, predictor
+            )
+        except Exception as e:
+            print(f"[Fraud Agent] ERROR: Failed to fetch transactions: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {
                 **state,
+                "sql_query": state.get("sql_query", ""),
+                "sql_result": None,
+                "transactions": [],
                 "fraud_predictions": [],
                 "flagged_transactions": [],
-                "llm_analysis": "No transactions provided for fraud detection.",
+                "llm_analysis": "",
                 "llm_analysis_json": [],
-                "final_fraud_report": "No transactions provided for fraud detection.",
-                "answer": "No transactions provided for fraud detection.",
-                "time_window_start": time_window_start,
-                "time_window_end": time_window_end,
+                "final_fraud_report": f"Error fetching transactions: {str(e)}",
+                "answer": f"Error fetching transactions: {str(e)}",
+                "time_window_start": "",
+                "time_window_end": "",
             }
 
-        # Extract time window from transactions if available
-        if transactions:
-            transaction_dates = [t.get("transaction_datetime") for t in transactions if t.get("transaction_datetime")]
-            if transaction_dates:
-                try:
-                    from datetime import datetime
-                    dates = [datetime.fromisoformat(str(d).replace("Z", "+00:00")) if isinstance(d, str) else d for d in transaction_dates if d]
-                    if dates:
-                        time_window_start = min(dates).strftime("%Y-%m-%d") if hasattr(min(dates), 'strftime') else str(min(dates)).split()[0]
-                        time_window_end = max(dates).strftime("%Y-%m-%d") if hasattr(max(dates), 'strftime') else str(max(dates)).split()[0]
-                except:
-                    pass
+    def _handle_batch_fraud_detection(
+        state: Dict[str, Any],
+        transactions: List[Dict[str, Any]],
+        sql_query: str,
+        sql_result: Any,
+        predictor
+    ) -> Dict[str, Any]:
+        """Handle batch fraud detection: XGBoost prediction and report generation."""
+        # Extract time window from transactions
+        time_window_start, time_window_end = extract_time_window_from_transactions(transactions)
 
         # Stage 1: ML model predictions for all transactions
+        print("\n[Fraud Agent] Stage 1: Model Detection - Running XGBoost model on transactions...")
+        print(f"[Fraud Agent] Analyzing {len(transactions)} transactions...")
         fraud_predictions = predictor.predict_batch(transactions)
+        print(f"[Fraud Agent] Model Detection completed. Processed {len(fraud_predictions)} predictions.")
 
-        # Stage 2: Filter transactions with fraud_probability >= threshold
+        # Filter transactions with fraud_probability >= threshold
         threshold = predictor.decision_threshold
+        print(f"[Fraud Agent] Filtering transactions with fraud probability >= {threshold:.4f}...")
         flagged_transactions = []
 
         for transaction, prediction in zip(transactions, fraud_predictions):
             fraud_prob = prediction.get("fraud_probability", 0.0)
-
-            # Only process transactions that exceed threshold
             if fraud_prob >= threshold:
                 flagged_transactions.append({
                     "transaction": transaction,
@@ -181,106 +240,29 @@ def create_fraud_agent_node(
                     "ml_is_fraud": prediction.get("is_fraud", False),
                 })
 
-        # Stage 3: LLM analysis for flagged transactions
+        print(f"[Fraud Agent] Found {len(flagged_transactions)} transactions exceeding threshold.")
+
+        # Generate report with flagged transaction IDs
         if flagged_transactions:
-            # Format transactions text for prompt template
-            transaction_parts = []
-            for idx, item in enumerate(flagged_transactions, 1):
-                transaction = item.get("transaction", {})
-                fraud_prob = item.get("fraud_probability", 0.0)
-                confidence = item.get("confidence", "unknown")
+            print("[Fraud Agent] Generating fraud detection report with flagged transactions...")
 
-                transaction_parts.append(f"Transaction {idx}:")
-                transaction_parts.append(f"  ML Fraud Probability: {fraud_prob:.4f} ({confidence} confidence)")
-                transaction_parts.append(f"  Transaction Details:")
-
-                # Format transaction details
-                for key, value in transaction.items():
-                    if value is not None:
-                        transaction_parts.append(f"    {key}: {value}")
-
-                transaction_parts.append("")
-
-            transactions_text = "\n".join(transaction_parts)
-
-            # Format user prompt using template
-            user_prompt_messages = FRAUD_ANALYSIS_USER_PROMPT.format_messages(
-                transactions_text=transactions_text
-            )
-            user_prompt = user_prompt_messages[0].content if user_prompt_messages else transactions_text
-
-            # Get LLM analysis (should be JSON)
-            llm_analysis_raw = llm.chat(
-                system_prompt=FRAUD_LLM_SYSTEM_PROMPT,
-                user_prompt=user_prompt,
-                response_format=None,
-            )
-
-            # Parse JSON response
-            llm_analysis_json = []
-            llm_analysis = llm_analysis_raw
-            try:
-                # Clean up potential markdown code blocks
-                cleaned = llm_analysis_raw.strip()
-                if cleaned.startswith("```json"):
-                    cleaned = cleaned[7:]
-                elif cleaned.startswith("```"):
-                    cleaned = cleaned[3:]
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3]
-                cleaned = cleaned.strip()
-
-                llm_analysis_json = json.loads(cleaned)
-                if not isinstance(llm_analysis_json, list):
-                    llm_analysis_json = []
-            except (json.JSONDecodeError, Exception) as e:
-                # If parsing fails, keep empty list
-                llm_analysis_json = []
-                print(f"Warning: Failed to parse LLM JSON response: {e}")
-
-            # Create final report combining ML predictions and LLM analysis
-            report_parts = [
-                f"Fraud Detection Analysis Report",
-                f"=" * 50,
-                f"",
-                f"Total transactions analyzed: {len(transactions)}",
-                f"Transactions flagged by ML model (probability >= {threshold:.2f}): {len(flagged_transactions)}",
-                f"",
-                f"LLM Analysis:",
-                json.dumps(llm_analysis_json, indent=2) if llm_analysis_json else llm_analysis,
-                f"",
-                f"Detailed ML Predictions:",
-                f"-" * 50,
+            # Extract transaction IDs
+            transaction_ids = [
+                item["transaction"].get("transaction_id")
+                for item in flagged_transactions
+                if item["transaction"].get("transaction_id")
             ]
 
-            for idx, item in enumerate(flagged_transactions, 1):
-                trans = item["transaction"]
-                prob = item["fraud_probability"]
-                conf = item["confidence"]
-                trans_id = trans.get("transaction_id", f"Transaction {idx}")
-
-                report_parts.append(f"Transaction {idx} (ID: {trans_id}):")
-                report_parts.append(f"  ML Fraud Probability: {prob:.4f} ({conf} confidence)")
-                report_parts.append(f"  Amount: ${trans.get('transaction_amount', 'N/A')}")
-                report_parts.append(f"  Merchant: {trans.get('merchant_name', 'N/A')}")
-                report_parts.append(f"  Category: {trans.get('merchant_category', 'N/A')}")
-                report_parts.append("")
-
-            final_fraud_report = "\n".join(report_parts)
-
-            # Create answer for router (will be formatted in chat_interface)
-            answer = final_fraud_report
-        else:
-            llm_analysis = "No transactions exceeded the fraud probability threshold. All transactions appear legitimate based on the ML model."
-            llm_analysis_json = []
-            final_fraud_report = (
-                f"Fraud Detection Analysis Report\n"
-                f"{'=' * 50}\n\n"
-                f"Total transactions analyzed: {len(transactions)}\n"
-                f"Transactions flagged by ML model (probability >= {threshold:.2f}): 0\n\n"
-                f"Result: No suspicious transactions detected.\n"
-                f"All transactions have fraud probability below the threshold ({threshold:.2f})."
+            # Format report
+            final_fraud_report = format_fraud_detection_report(
+                len(transactions), len(flagged_transactions), threshold, transaction_ids
             )
+
+            answer = final_fraud_report
+            print("[Fraud Agent] Fraud detection analysis completed. LLM explanation available on request.")
+        else:
+            print("[Fraud Agent] No transactions exceeded the fraud probability threshold.")
+            final_fraud_report = format_no_fraud_report(len(transactions), threshold)
             answer = final_fraud_report
 
         return {
@@ -290,13 +272,66 @@ def create_fraud_agent_node(
             "transactions": transactions,
             "fraud_predictions": fraud_predictions,
             "flagged_transactions": flagged_transactions,
-            "llm_analysis": llm_analysis,
-            "llm_analysis_json": llm_analysis_json,
+            "llm_analysis": "",
+            "llm_analysis_json": [],
             "final_fraud_report": final_fraud_report,
             "answer": answer,
             "time_window_start": time_window_start,
             "time_window_end": time_window_end,
         }
+
+    def fraud_agent_node(state: Dict[str, Any]) -> Dict[str, Any]:
+        """Fraud agent node with two main functions:
+        1. Single transaction detection: SQL → XGBoost → LLM → Output explanation
+        2. Time window detection: SQL → XGBoost → Output flagged transaction IDs
+        """
+        question = state.get("question", "")
+        transactions = state.get("transactions", [])
+
+        if not sql_agent:
+            return {
+                **state,
+                "fraud_predictions": [],
+                "flagged_transactions": [],
+                "llm_analysis": "",
+                "llm_analysis_json": [],
+                "final_fraud_report": "SQL agent not available.",
+                "answer": "SQL agent not available.",
+                "time_window_start": "",
+                "time_window_end": "",
+            }
+
+        # Case 1: Single transaction detection (SQL → XGBoost → LLM)
+        transaction_id = extract_transaction_id_from_question(question)
+        if transaction_id:
+            return _handle_single_transaction_detection(
+                state, transaction_id, sql_agent, predictor, llm
+            )
+
+        # Case 2: Time window fraud detection (SQL → XGBoost → Output IDs)
+        # If transactions already provided, use them directly
+        if transactions:
+            return _handle_batch_fraud_detection(
+                state, transactions, state.get("sql_query", ""), state.get("sql_result"), predictor
+            )
+
+        # If question provided but no transactions, generate SQL and fetch
+        if question:
+            return _handle_time_window_detection(state, question, sql_agent, predictor)
+
+        # No valid input
+        return {
+            **state,
+            "fraud_predictions": [],
+            "flagged_transactions": [],
+            "llm_analysis": "",
+            "llm_analysis_json": [],
+            "final_fraud_report": "No transactions provided for fraud detection.",
+            "answer": "No transactions provided for fraud detection.",
+            "time_window_start": "",
+            "time_window_end": "",
+        }
+
 
     return fraud_agent_node
 

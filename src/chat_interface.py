@@ -139,28 +139,17 @@ def main():
 
     if fraud_result:
         # Format fraud detection output
-        transactions = fraud_result.get("transactions", [])
-        flagged_transactions = fraud_result.get("flagged_transactions", [])
-        time_window_start = fraud_result.get("time_window_start", "")
-        time_window_end = fraud_result.get("time_window_end", "")
+        # Check if this is a detailed explanation (has LLM analysis) or just the initial report
         llm_analysis_json = fraud_result.get("llm_analysis_json", [])
-
-        print("\nFraud Detection Analysis")
-        print("=" * 60)
-
-        if time_window_start and time_window_end:
-            print(f"\nTime Window: {time_window_start} to {time_window_end}")
-        print(f"Total Transactions: {len(transactions)}")
-        print(f"Flagged Transactions: {len(flagged_transactions)}")
-
-        if llm_analysis_json:
-            print("\nLLM Analysis (JSON):")
-            print(json.dumps(llm_analysis_json, indent=2))
-        elif len(flagged_transactions) == 0:
-            print("\nNo transactions were flagged as potentially fraudulent.")
+        answer = fraud_result.get("answer", "")
+        
+        # If there's LLM analysis, this is a detailed explanation for a specific transaction
+        if llm_analysis_json or (answer and "LLM Analysis for Transaction" in answer):
+            # This is a detailed explanation - print it directly
+            print("\n" + answer)
         else:
-            print("\nLLM Analysis could not be parsed as JSON.")
-            print(fraud_result.get("llm_analysis", ""))
+            # This is the initial fraud detection report - print it as formatted
+            print("\n" + answer)
     else:
         # Regular output format
         print("\nFinal Answer:")
