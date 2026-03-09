@@ -1,4 +1,4 @@
-# Banking Agent (refactored)
+# Banking Agent
 
 Agentic workflow with **planner**, **orchestrator**, **SQL**, **RAG** (vector DB + web search), and **transaction fraud detection** agents. Built with LangGraph.
 
@@ -14,43 +14,41 @@ Agentic workflow with **planner**, **orchestrator**, **SQL**, **RAG** (vector DB
 ## Layout
 
 ```
-├── graph/                    # LangGraph components
-│   ├── planner/              # Plan generation (goal + steps)
-│   ├── executor/             # Step router & execution (SQL/RAG/Fraud)
-│   ├── orchestrator/         # Loop: execute → merge → aggregate (and replan)
-│   ├── nodes/                # Runtime graph nodes (init, select, execute, merge, evaluate, replan, aggregate)
-│   ├── sql_agent/            # SQL tools + ReAct agent
-│   ├── rag_agent/            # RAG + Tavily tools + ReAct agent
-│   ├── fraud_agent/          # Fraud tools + batch inference + ReAct agent
-│   ├── main_graph.py         # Plan-only graph
-│   ├── runtime_graph.py      # Full graph-native orchestration (concurrent steps, replan)
-│   └── runtime_state.py      # State for runtime graph
-├── prompts/                  # Versioned prompt assets (.md + meta.yaml)
-│   ├── planner/
-│   ├── aggregation/
-│   ├── sql_agent/
-│   ├── rag_agent/
-│   └── fraud_agent/
-├── ingest/                   # RAG ingest (PDF → split → upsert to Pinecone)
-├── scripts/
-├── utils/                    # env, db, memory, prompt_loader
-├── models/                   # LLM (OpenAI)
-├── run.py                    # CLI entrypoint
-└── (see project root requirements.txt)
+├── src/                      # Main package
+│   ├── graph/                # LangGraph components
+│   │   ├── planner/          # Plan generation (goal + steps)
+│   │   ├── executor/        # Step router & execution (SQL/RAG/Fraud)
+│   │   ├── orchestrator/    # Loop: execute → merge → aggregate (and replan)
+│   │   ├── nodes/           # Runtime graph nodes
+│   │   ├── sql_agent/
+│   │   ├── rag_agent/
+│   │   ├── fraud_agent/
+│   │   ├── main_graph.py
+│   │   └── runtime_graph.py
+│   ├── prompts/             # Versioned prompt assets
+│   ├── ingest/               # RAG ingest (PDF → Pinecone)
+│   ├── scripts/
+│   ├── utils/                # env, db, memory, prompt_loader
+│   ├── models/               # LLM (OpenAI)
+│   └── run.py                # CLI entrypoint
+├── .gitignore
+├── README.md
+└── requirements.txt
 ```
 
-## Run (from project root)
+## Run (from repo root)
 
 ```bash
-python -m refactored.run "How much did I spend this month?"
-python -m refactored.run "用户输入" [customer_id] [session_id]
+# Set OPENAI_API_KEY (e.g. in .env at repo root)
+python -m src.run "How much did I spend this month?"
+python -m src.run "用户输入" [customer_id] [session_id]
 ```
 
-**Graph-native orchestration**: `USE_RUNTIME_GRAPH=1 python -m refactored.run "your question" [customer_id] [session_id]`
+**Graph-native orchestration**: `USE_RUNTIME_GRAPH=1 python -m src.run "your question" [customer_id] [session_id]`
 
-**Plan only**: `from refactored.run import run_planner` → `run_planner("...")` returns `result["plan"]`.
+**Plan only**: `from src.run import run_planner` → `run_planner("...")` returns `result["plan"]`.
 
 ## Dependencies
 
-- Project root `.env` (OPENAI_API_KEY; optional DB_*, Redis, Pinecone, Tavily).
-- Python: openai, langgraph, python-dotenv, jsonschema, pyyaml; see root `requirements.txt`.
+- Repo root `.env` (OPENAI_API_KEY; optional DB_*, Redis, Pinecone, Tavily).
+- Python: see `requirements.txt`.
