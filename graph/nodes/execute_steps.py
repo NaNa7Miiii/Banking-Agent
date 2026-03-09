@@ -42,12 +42,20 @@ def execute_ready_steps_node(state: RuntimeState) -> RuntimeState:
     collected in the main thread and written to step_results / normalized_steps.
     Derived sets are recomputed by select_ready_steps / evaluate_progress.
     """
+    import logging
+    logger = logging.getLogger(__name__)
     ready_step_ids = state.get("ready_step_ids") or []
     normalized_steps = list(state.get("normalized_steps") or [])
     base_ctx = state.get("execution_context") or {}
     execution_context: ExecutionContext = dict(base_ctx)
-    execution_context["previous_step_results"] = state.get("step_results") or {}
-    step_results = dict(state.get("step_results") or {})
+    prev = state.get("step_results") or {}
+    execution_context["previous_step_results"] = prev
+    logger.info(
+        "execute_ready_steps: ready_step_ids=%s previous_step_results_keys=%s",
+        ready_step_ids,
+        list(prev.keys()),
+    )
+    step_results = dict(prev)
 
     if not ready_step_ids:
         return {"step_results": step_results, "normalized_steps": normalized_steps}

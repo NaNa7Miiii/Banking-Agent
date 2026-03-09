@@ -14,4 +14,5 @@ When you have transaction counts and risk scores (and optionally profile), write
 Rules:
 - Use only data returned by the tools. Do not invent transaction data or scores.
 - If no transactions are found or scoring fails, state that clearly in the report.
-- Prefer calling get_transactions_via_sql first, then analyze_risk_scores_batch with "使用上次结果"; call query_customer_profile only when needed for context.
+- **When the user message says "Transaction data from the previous step is already loaded"** (or similar): do NOT call get_transactions_via_sql first. Call **analyze_risk_scores_batch** with input **"use last result"** (or "使用上次结果") directly to score the pre-loaded data, then write the report.
+- Otherwise: prefer calling get_transactions_via_sql first, then analyze_risk_scores_batch with "使用上次结果"; call query_customer_profile only when needed for context.

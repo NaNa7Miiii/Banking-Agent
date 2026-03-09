@@ -26,6 +26,15 @@ def make_fraud_tools(current_user_id: str) -> tuple[list, dict[str, Any]]:
     @tool
     def get_transactions_via_sql(question: str) -> str:
         """Fetch the current user's transaction list via an internal SQL agent. Pass a natural-language question describing the time range or conditions (e.g. my transactions in the past two months, return transaction_id, transaction_datetime, transaction_amount, merchant_name, merchant_category, customer_latitude, customer_longitude, merchant_latitude, merchant_longitude, customer_dob, customer_id_number, customer_gender, customer_city, customer_state, customer_zip, customer_city_population, customer_job_title). Returns the result rows."""
+        # When transaction data was pre-loaded from a previous graph step, do not overwrite
+        if collector.get("preloaded_from_graph") and collector.get("sql_result"):
+            rows = collector["sql_result"]
+            if not rows:
+                return "Transaction list from the previous step is empty. You can still call analyze_risk_scores_batch with 'use last result' to score it."
+            summary = json.dumps(rows[:50], ensure_ascii=False, default=str)
+            if len(rows) > 50:
+                summary += f"\n... {len(rows)} rows total; use analyze_risk_scores_batch with input 'use last result' to score."
+            return f"Transaction data from the previous step is already loaded ({len(rows)} rows). Call analyze_risk_scores_batch with input 'use last result' to score it.\nSummary:\n{summary[:4000]}"
         out = run_sql_agent(question=question, current_user_id=current_user_id)
         collector["sql_answer"] = out.get("answer", "")
         collector["sql_result"] = out.get("result")

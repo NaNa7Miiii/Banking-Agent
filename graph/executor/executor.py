@@ -76,14 +76,30 @@ def _run_rag(step: dict[str, Any], context: ExecutionContext) -> StepResult:
 
 
 def _run_fraud(step: dict[str, Any], context: ExecutionContext) -> StepResult:
+    import logging
+    logger = logging.getLogger(__name__)
     from refactored.graph.fraud_agent.pipeline import run_fraud_agent
     instruction = _instruction_from_step(step)
     user_id = context.get("current_user_id") or ""
     prev_results = context.get("previous_step_results") or {}
+    logger.info(
+        "fraud_executor: step_id=%s prev_results_keys=%s depends_on=%s",
+        step.get("id"),
+        list(prev_results.keys()),
+        [d.get("step_id") if isinstance(d, dict) else d for d in (step.get("depends_on") or [])],
+    )
     initial_sql_result = None
     initial_sql_answer = None
+
+    def _extract_dep_id(dep: Any) -> str:
+        if isinstance(dep, str):
+            return (dep or "").strip()
+        if isinstance(dep, dict):
+            return (dep.get("step_id") or dep.get("step") or "").strip()
+        return ""
+
     for dep in (step.get("depends_on") or []):
-        dep_id = (dep.get("step_id") or "").strip()
+        dep_id = _extract_dep_id(dep)
         if not dep_id:
             continue
         sr = prev_results.get(dep_id) or {}
@@ -91,10 +107,31 @@ def _run_fraud(step: dict[str, Any], context: ExecutionContext) -> StepResult:
             continue
         data = sr.get("data") or {}
         artifacts = data.get("artifacts") or {}
-        if "result" in artifacts and artifacts["result"] is not None:
-            initial_sql_result = artifacts["result"]
+        res = artifacts.get("result")
+        if res is not None and isinstance(res, list):
+            initial_sql_result = res
             initial_sql_answer = (data.get("summary") or "").strip()
             break
+
+    # Fallback: if no result from depends_on (e.g. wrong step_id format), use first prev step with artifacts.result
+    if initial_sql_result is None and prev_results:
+        for sid, sr in prev_results.items():
+            if (sr or {}).get("status") != "ok":
+                continue
+            data = (sr or {}).get("data") or {}
+            artifacts = data.get("artifacts") or {}
+            if "result" in artifacts and artifacts["result"] is not None and isinstance(artifacts["result"], list):
+                initial_sql_result = artifacts["result"]
+                initial_sql_answer = (data.get("summary") or "").strip()
+                break
+
+    logger.info(
+        "fraud_executor: step_id=%s initial_sql_result_set=%s initial_len=%s",
+        step.get("id"),
+        initial_sql_result is not None,
+        len(initial_sql_result) if initial_sql_result is not None else 0,
+    )
+
     question = instruction
     if initial_sql_result is not None:
         question = f"{instruction}\n\n(Transaction data from the previous step is already loaded; call analyze_risk_scores_batch with input 'use last result' to score it.)"

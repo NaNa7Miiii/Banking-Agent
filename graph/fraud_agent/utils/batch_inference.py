@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
 
 from refactored.graph.fraud_agent.config import (
@@ -14,6 +15,31 @@ from refactored.graph.fraud_agent.config import (
     get_if_model_path,
 )
 from refactored.graph.fraud_agent.utils.features import build_feature_df_from_transactions
+
+
+def _to_native_scalar(v: Any) -> Any:
+    """Convert numpy/pandas types to native Python so no Series/ndarray slips into dicts (avoids unhashable)."""
+    if v is None or isinstance(v, (bool, str, int, float)):
+        return v
+    if isinstance(v, (np.integer, np.int32, np.int64)):
+        return int(v)
+    if isinstance(v, (np.floating, np.float32, np.float64)):
+        return float(v)
+    if isinstance(v, np.ndarray):
+        return v.tolist()
+    if isinstance(v, pd.Series):
+        return v.tolist()
+    if hasattr(v, "isoformat"):  # datetime-like
+        return v.isoformat() if hasattr(v, "isoformat") else str(v)
+    return v
+
+
+def _sanitize_transactions(transactions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ensure each row is a dict of native Python scalars (no Series/ndarray as values)."""
+    return [
+        {k: _to_native_scalar(v) for k, v in row.items()}
+        for row in transactions
+    ]
 
 
 def run_batch_risk_scores(
@@ -26,6 +52,7 @@ def run_batch_risk_scores(
     """
     if not transactions:
         return {"results": [], "summary": "No transactions to score."}
+    transactions = _sanitize_transactions(transactions)
 
     config_path = get_feature_config_path()
     if not config_path.exists():
@@ -100,3 +127,17 @@ def run_batch_risk_scores(
     total = len(transactions)
     summary = f"Total {total} tx: {high_count} high-risk, {review_count} recommend review."
     return {"results": out_results, "summary": summary}
+
+
+if __name__ == "__main__":
+    # Quick sanity check: rows with Series/numpy must become native (avoids unhashable type: 'Series')
+    row_with_series = {
+        "transaction_id": 1,
+        "amount": np.float64(10.5),
+        "bad": pd.Series([1, 2]),
+    }
+    out = _sanitize_transactions([row_with_series])
+    assert isinstance(out[0]["amount"], float)
+    assert isinstance(out[0]["bad"], list)
+    assert out[0]["bad"] == [1, 2]
+    print("_sanitize_transactions: ok (no unhashable Series)")
