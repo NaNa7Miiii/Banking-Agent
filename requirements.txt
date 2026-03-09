@@ -18,9 +18,17 @@ tavily-python>=0.7.0  # For web search functionality
 # AWS SDK (for S3/RDS data access)
 boto3>=1.34.0
 
-# Data Processing
+# Data Processing & EDA
 pandas>=2.0.0
 numpy>=1.24.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# ML (XGBoost + Kaggle dataset)
+xgboost>=2.0.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
+kagglehub[pandas-datasets]>=0.2.0
 
 # Configuration & Environment
 python-dotenv>=1.0.0
@@ -44,3 +52,5 @@ spacy>=3.7.0
 # Utilities
 python-dateutil>=2.8.0  # For date parsing
 redis>=5.0.0  # For conversation memory storage
+jsonschema>=4.20.0  # refactored: validate planner output against output_schema.json
+pyyaml>=6.0  # refactored: prompt meta.yaml loading (optional in prompt_loader)

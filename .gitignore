@@ -1,34 +1,35 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist/
-build/
-
-# Jupyter Notebooks (specific exclusion)
-src/data/preprocessor.ipynb
-
-# Environment
-.env
+.venv/
 venv/
-env/
 ENV/
 
-# IDE
-.vscode/
+# IDE & OS
 .idea/
+.vscode/
 *.swp
 *.swo
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Data files - exclude large CSV files
-src/data/processed/clean_fraud.csv
-src/data/raw_data/fraud test.csv
-src/data/processed_splits/train_processed.csv
-*.pkl
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Local / excluded from reorg (do not re-add)
+CIBC_docs/
+docs/
+notebooks/
+
+# Optional: uncomment if you have large assets
+# resources/data/
+# *.pkl
+# *.joblib

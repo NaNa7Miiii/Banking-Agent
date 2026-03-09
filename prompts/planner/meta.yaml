@@ -1,0 +1,7 @@
+name: banking-planner
+version: "0.1.0"
+owner: platform-team
+output_schema: output_schema.json
+changelog_template: |
+  ## [version] - date
+  - change description

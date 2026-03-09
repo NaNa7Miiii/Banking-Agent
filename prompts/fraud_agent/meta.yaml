@@ -1,0 +1,6 @@
+name: fraud-agent
+version: "0.1.0"
+owner: platform-team
+changelog_template: |
+  ## [version] - date
+  - change description
