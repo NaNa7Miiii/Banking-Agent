@@ -1,5 +1,6 @@
 """
-Execute read-only SQL with row-level enforcement and column masking.
+Execute read-only SQL with row-level enforcement, column masking, and LIMIT/row cap.
+Big-company practice: (1) inject default LIMIT when missing; (2) cap result set size.
 """
 import re
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 from sqlalchemy.engine import Engine
 
 from src.utils.db import run_read_only
+from src.graph.sql_agent.config import get_default_sql_limit, get_max_sql_rows
 
 
 READ_ONLY_PATTERN = re.compile(
@@ -17,6 +19,8 @@ FORBIDDEN_PATTERN = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE)\b",
     re.IGNORECASE,
 )
+# Match LIMIT clause (e.g. LIMIT 100 or LIMIT 10 OFFSET 5)
+LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(:\w+|\d+)\b", re.IGNORECASE)
 
 
 def _normalize_user_filter(sql: str, user_column: str) -> str:
@@ -71,23 +75,40 @@ def _inject_user_filter(sql: str, user_column: str, current_user_id: str) -> str
     return sql_stripped
 
 
+def _ensure_limit(sql: str, default_limit: int) -> tuple[str, int]:
+    """If SQL has no LIMIT clause, append LIMIT :lim. Returns (sql, limit_value)."""
+    stripped = sql.strip().rstrip(";")
+    if LIMIT_PATTERN.search(stripped):
+        return stripped, default_limit  # already has LIMIT; param may still be used for cap
+    return stripped + f" LIMIT {default_limit}", default_limit
+
+
 def execute_read_only_sql(
     engine: Engine,
     sql: str,
     current_user_id: str,
     user_column: str,
     forbidden_columns: frozenset,
-) -> tuple[list[dict[str, Any]] | None, str | None]:
+) -> tuple[list[dict[str, Any]] | None, str | None, bool]:
+    """
+    Returns (rows, error_message, truncated). truncated is True when result set hit the row cap.
+    """
     if not READ_ONLY_PATTERN.match(sql) or FORBIDDEN_PATTERN.search(sql):
-        return None, "Only SELECT queries are allowed."
+        return None, "Only SELECT queries are allowed.", False
+    default_limit = get_default_sql_limit()
+    max_rows = get_max_sql_rows()
     try:
         sql_safe = _inject_user_filter(sql, user_column, current_user_id)
+        sql_safe, _ = _ensure_limit(sql_safe, default_limit)
         params: dict[str, Any] = {"uid": current_user_id}
         rows = run_read_only(engine, sql_safe, params)
     except Exception as e:
-        return None, str(e)
+        return None, str(e), False
     out = []
-    for row in rows:
+    for i, row in enumerate(rows):
+        if i >= max_rows:
+            break
         r = {k: v for k, v in row.items() if k not in forbidden_columns}
         out.append(r)
-    return out, None
+    truncated = len(out) >= max_rows
+    return out, None, truncated

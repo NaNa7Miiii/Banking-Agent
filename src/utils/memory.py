@@ -97,19 +97,6 @@ def _get_redis_url() -> str:
     return f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 
-def _get_summarizer_llm():
-    """LangChain ChatOpenAI for ConversationSummaryBufferMemory (summarization)."""
-    from langchain_openai import ChatOpenAI
-    api_key = get_env("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set")
-    return ChatOpenAI(
-        model="gpt-4.1",
-        temperature=0.1,
-        api_key=api_key,
-    )
-
-
 def load_summary(customer_id_number: str, session_id: str) -> str:
     """Load moving_summary_buffer from Redis. Returns "" if not set."""
     r = _get_redis_client()
@@ -156,7 +143,8 @@ def create_memory(
         session_id=redis_key,
     )
     if llm is None:
-        llm = _get_summarizer_llm()
+        from src.models.llm import get_langchain_chat_model
+        llm = get_langchain_chat_model("summarizer")
     memory = RedisTrimmingSummaryBufferMemory(
         llm=llm,
         chat_memory=message_history,

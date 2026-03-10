@@ -9,10 +9,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from src.utils.env import load_env
 from src.graph.fraud_agent.tools import make_fraud_tools
 from src.graph.fraud_agent.utils.prompts import agent_system
+from src.models.llm import get_create_agent_model_string
 
 load_env()
-
-FRAUD_MODEL = "openai:gpt-4.1"
 
 
 def _last_ai_content(messages: list) -> str:
@@ -45,7 +44,7 @@ def run_fraud_agent_react(
         collector["sql_answer"] = initial_sql_answer
 
     graph = create_agent(
-        model=FRAUD_MODEL,
+        model=get_create_agent_model_string("fraud"),
         tools=tools,
         system_prompt=agent_system(),
     )

@@ -43,7 +43,14 @@ def get_engine(echo: bool = False) -> Engine:
 
 
 def run_read_only(engine: Engine, sql: str, params: dict | None = None) -> list[dict]:
-    """Execute a read-only query and return rows as list of dicts."""
+    """
+    Execute a read-only query and return rows as list of dicts.
+
+    This function does NOT validate that the SQL is read-only. It must only be
+    called with trusted SQL (e.g. built from config + parameterized params).
+    For user- or LLM-influenced SQL, use sql_agent.utils.execution.execute_read_only_sql
+    so that write operations are blocked and user context is enforced.
+    """
     with engine.connect() as conn:
         result = conn.execute(text(sql), params or {})
         rows = result.mappings().fetchall()

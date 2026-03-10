@@ -92,12 +92,14 @@ def maybe_replan_node(state: RuntimeState) -> RuntimeState:
             "replan_count": replan_count,
         }
 
-    # Full replan: build context and call replan LLM
+    # Full replan: build context and call replan LLM (StepResult has data.summary, data.artifacts)
     completed_summary = []
     for sid in (state.get("completed_step_ids") or []):
         res = step_results.get(sid) or {}
-        art = res.get("artifacts") or []
-        summary = f"- {sid}: " + (str(art)[:200] if art else "ok")
+        data = res.get("data") or {}
+        art = data.get("artifacts")
+        summ = (data.get("summary") or "").strip()
+        summary = f"- {sid}: " + (summ[:200] if summ else (str(art)[:200] if art else "ok"))
         completed_summary.append(summary)
     user_message = (
         f"Original user goal: {user_input}\n\n"

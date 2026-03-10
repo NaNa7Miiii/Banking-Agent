@@ -36,13 +36,15 @@ def get_client() -> OpenAI:
     return _client
 
 
-LLMRole = Literal["planner", "generic", "sql", "rag", "aggregation"]
+LLMRole = Literal["planner", "generic", "sql", "rag", "aggregation", "summarizer", "fraud"]
 ROLE_DEFAULTS = {
     "planner": {"model_name": "gpt-4.1", "temperature": 0.1},
-    "generic": {"model_name": "gpt-4.1-mini", "temperature": 0.1},
-    "sql": {"model_name": "gpt-4.1-mini", "temperature": 0.0},
+    "generic": {"model_name": "gpt-4.1", "temperature": 0.1},
+    "sql": {"model_name": "gpt-4.1", "temperature": 0.0},
     "rag": {"model_name": "gpt-4.1", "temperature": 0.0},
     "aggregation": {"model_name": "gpt-4.1", "temperature": 0.2},
+    "summarizer": {"model_name": "gpt-4.1", "temperature": 0.1},
+    "fraud": {"model_name": "gpt-4.1", "temperature": 0.0},
 }
 
 _llm_cache: dict = {}
@@ -127,3 +129,32 @@ def get_llm(
             retry_delay=kwargs.get("retry_delay", 1.0),
         )
     return _llm_cache[cache_key]
+
+
+def get_model_name(role: LLMRole = "generic") -> str:
+    """Return the model name for a role (e.g. for LangChain create_agent model string)."""
+    defaults = ROLE_DEFAULTS.get(role, ROLE_DEFAULTS["generic"])
+    return defaults["model_name"]
+
+
+def get_create_agent_model_string(role: LLMRole) -> str:
+    """Return the model string expected by LangChain create_agent (e.g. 'openai:gpt-4.1')."""
+    return f"openai:{get_model_name(role)}"
+
+
+def get_langchain_chat_model(role: LLMRole = "generic"):
+    """
+    Return a LangChain ChatOpenAI instance for the given role.
+    Use this when a LangChain BaseChatModel is required (e.g. ConversationSummaryBufferMemory).
+    Config is read from ROLE_DEFAULTS; API key from env.
+    """
+    from langchain_openai import ChatOpenAI
+    defaults = ROLE_DEFAULTS.get(role, ROLE_DEFAULTS["generic"])
+    api_key = get_env("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set in environment or .env file")
+    return ChatOpenAI(
+        model=defaults["model_name"],
+        temperature=defaults["temperature"],
+        api_key=api_key,
+    )

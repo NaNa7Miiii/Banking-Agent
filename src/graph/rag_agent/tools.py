@@ -122,9 +122,9 @@ def make_rag_tools(
 
     @tool
     def web_search(query: str) -> str:
-        """Searches the web for additional information. Input: search query."""
+        """Searches the web for public/policy information only. Not for user-private questions (use SQL/Fraud agents for those). Input: search query."""
         if not use_web_fallback:
-            return "Web search is disabled."
+            return "Web search is disabled for this question (private/customer data must not be sent to external search)."
         contexts, obs = tool_web_search(query, max_results=max_web_contexts)
         collector["web_contexts"].extend(contexts)
         return obs

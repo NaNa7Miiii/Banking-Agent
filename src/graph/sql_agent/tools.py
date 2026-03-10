@@ -7,7 +7,7 @@ from typing import Any
 from langchain_core.tools import tool
 from sqlalchemy.engine import Engine
 
-from src.graph.sql_agent.config import USER_COLUMN, FORBIDDEN_COLUMNS
+from src.graph.sql_agent.config import USER_COLUMN, FORBIDDEN_COLUMNS, get_max_sql_rows
 from src.graph.sql_agent.utils.schema import get_schema as fetch_schema
 from src.graph.sql_agent.utils.value_retrieval import (
     get_candidate_filter_values,
@@ -125,18 +125,24 @@ def make_sql_tools(
     @tool
     def execute_sql(sql: str) -> str:
         """Run a read-only SQL query. Pass the exact SQL string. Returns result summary or error."""
-        rows, err = execute_read_only_sql(
+        rows, err, truncated = execute_read_only_sql(
             engine, sql, current_user_id, USER_COLUMN, FORBIDDEN_COLUMNS
         )
         collector["sql"] = sql
         collector["result"] = rows
         collector["error"] = err
+        cap = get_max_sql_rows()
+        if truncated:
+            collector["result_truncated_at"] = cap
         if err:
             return f"Error: {err}"
         if not rows:
             return "Success: 0 rows."
         result_str = json.dumps(rows[:30], ensure_ascii=False, default=str)
-        return f"Success: {len(rows)} row(s). Sample:\n{result_str[:2000]}"
+        msg = f"Success: {len(rows)} row(s). Sample:\n{result_str[:2000]}"
+        if truncated:
+            msg += f"\n(Results capped at {cap} rows. In your final answer, say the analysis is based on up to {cap} matching rows/transactions.)"
+        return msg
 
     @tool
     def fix_sql(failed_sql: str, error_msg: str) -> str:

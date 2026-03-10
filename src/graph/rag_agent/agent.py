@@ -11,11 +11,10 @@ from src.graph.rag_agent.state import RAGAgentState, initial_rag_state
 from src.graph.rag_agent.config import get_default_namespace
 from src.graph.rag_agent.tools import make_rag_tools
 from src.graph.rag_agent.utils.prompts import agent_system
+from src.graph.rag_agent.utils.web_search_gate import is_safe_for_web_search
+from src.models.llm import get_create_agent_model_string
 
 load_env()
-
-# Model string for create_agent (rag role uses gpt-4.1)
-RAG_MODEL = "openai:gpt-4.1"
 
 NO_CONTEXT_MESSAGE = (
     "I could not find sufficient information in the provided documents to answer this. "
@@ -47,18 +46,24 @@ def run_rag_agent_react(
     """
     Run RAG via LangChain create_agent: tools (query_rewrite, local_retrieve, web_search)
     in a tool-calling loop; then extract answer and build citations from collector.
+
+    Web search (Tavily) is only used for public/policy queries. User-private questions
+    (my transactions, account, fraud) are gated: no web search, to avoid PII leakage;
+    those should be routed to SQL agent or Fraud agent.
     """
     ns = namespace or get_default_namespace()
+    # Gate: allow web only when question is about public/policy info; private -> SQL/Fraud, no web
+    web_allowed = use_web_fallback and is_safe_for_web_search(question)
     tools, collector = make_rag_tools(
         namespace=ns,
         filter_dict=filter_dict,
-        use_web_fallback=use_web_fallback,
+        use_web_fallback=web_allowed,
         max_local_chunks=max_local_chunks,
         max_web_contexts=max_web_contexts,
     )
 
     graph = create_agent(
-        model=RAG_MODEL,
+        model=get_create_agent_model_string("rag"),
         tools=tools,
         system_prompt=agent_system(),
     )

@@ -11,10 +11,9 @@ from src.utils.db import get_engine
 from src.graph.sql_agent.config import get_table_name
 from src.graph.sql_agent.tools import make_sql_tools
 from src.graph.sql_agent.utils.prompts import agent_system
+from src.models.llm import get_create_agent_model_string
 
 load_env()
-
-SQL_MODEL = "openai:gpt-4.1"
 
 
 def _last_ai_content(messages: list) -> str:
@@ -49,7 +48,7 @@ def run_sql_agent_react(
     )
 
     graph = create_agent(
-        model=SQL_MODEL,
+        model=get_create_agent_model_string("sql"),
         tools=tools,
         system_prompt=agent_system(),
     )

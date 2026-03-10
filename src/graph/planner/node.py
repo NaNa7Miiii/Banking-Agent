@@ -2,6 +2,7 @@
 Planner node: load prompt, call LLM, parse and validate JSON plan. No execution; loose coupling.
 """
 import json
+import logging
 from typing import Any
 
 from src.graph.planner.state import PlannerState, Plan
@@ -10,7 +11,7 @@ from src.models.llm import get_llm
 from src.utils.prompt_loader import load_system_prompt
 from src.graph.planner.utils.schema_validator import load_schema, validate_plan
 
-
+logger = logging.getLogger(__name__)
 PLANNER_MODULE = "planner"
 
 
@@ -93,11 +94,20 @@ def create_planner_node(*, validate: bool = True):
 
         llm = get_llm(role="planner")
         raw = llm.chat(system_prompt=system_prompt, user_prompt=user_input)
-        plan = _parse_plan_json(raw)
+        try:
+            plan = _parse_plan_json(raw)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning("Planner LLM output was not valid JSON: %s. Raw (truncated): %s", e, (raw or "")[:500])
+            return {**state, "plan": None, "plan_error": "Plan parsing failed."}
+
         plan = _normalize_plan(plan)
 
         if validate:
-            validate_plan(plan, schema=schema)
+            try:
+                validate_plan(plan, schema=schema)
+            except Exception as e:
+                logger.warning("Planner output failed schema validation: %s", e)
+                return {**state, "plan": None, "plan_error": "Plan validation failed."}
 
         return {**state, "plan": plan}
 
