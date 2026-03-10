@@ -6,7 +6,7 @@ Structure the report as follows:
    Based on the risk score summary: Approve / Recommend review / Decline (or equivalent wording in the user's language).
 
 2. **Risk summary**  
-   - **Models**: Supervised (CatBoost) and unsupervised (Isolation Forest) scores and risk levels.  
+   - **Models**: XGBoost probability and risk_level (high/low by best threshold).  
    - **Spatial and temporal**: Whether the transaction is in an unusual location or time (if inferable from transactions or profile).  
    - **Behavior vs profile**: If customer profile was queried, compare this transaction (or batch) to the user's usual ticket size and common categories.
 

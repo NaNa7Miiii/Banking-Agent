@@ -15,7 +15,7 @@ def run_fraud_agent(
 ) -> dict[str, Any]:
     """
     Run the fraud agent: fetch current user transactions via SQL agent (or use initial_sql_* if provided),
-    batch score (CatBoost + IF), optionally query customer profile, then produce an interpretable risk analysis report.
+    batch score (XGBoost), optionally query customer profile, then produce an interpretable risk analysis report.
     """
     return run_fraud_agent_react(
         question=question,

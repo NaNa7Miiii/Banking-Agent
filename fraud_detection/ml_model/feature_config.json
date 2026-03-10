@@ -1,0 +1,34 @@
+{
+  "feature_cols": [
+    "merchant_name",
+    "merchant_category",
+    "transaction_amount",
+    "customer_gender",
+    "customer_city",
+    "customer_state",
+    "customer_zip",
+    "customer_latitude",
+    "customer_longitude",
+    "customer_city_population",
+    "customer_job_title",
+    "merchant_latitude",
+    "merchant_longitude",
+    "is_online",
+    "distance_to_merchant",
+    "effective_distance",
+    "hour_of_day",
+    "day_of_week",
+    "tx_count_1h",
+    "tx_count_24h",
+    "amt_sum_24h",
+    "customer_age"
+  ],
+  "cat_features": [
+    "merchant_name",
+    "merchant_category",
+    "customer_gender",
+    "customer_city",
+    "customer_state",
+    "customer_job_title"
+  ]
+}

@@ -50,7 +50,7 @@ def make_fraud_tools(current_user_id: str) -> tuple[list, dict[str, Any]]:
 
     @tool
     def analyze_risk_scores_batch(transactions_json: str) -> str:
-        """Run batch risk scoring (CatBoost + Isolation Forest) on a list of transactions. Input: (1) full JSON array from get_transactions_via_sql, or (2) a trigger phrase (e.g. 'use last result') to reuse the last query result. Each row should include transaction_id, transaction_datetime, transaction_amount, merchant_name, merchant_category, customer_latitude, customer_longitude, merchant_latitude, merchant_longitude, customer_dob, customer_id_number, etc. Returns per-tx catboost_prob, isolation_forest_score, risk_level and a summary."""
+        """Run batch risk scoring (XGBoost) on a list of transactions. Input: (1) full JSON array from get_transactions_via_sql, or (2) a trigger phrase (e.g. 'use last result') to reuse the last query result. Each row should include transaction_id, transaction_datetime, transaction_amount, merchant_name, merchant_category, customer_latitude, customer_longitude, merchant_latitude, merchant_longitude, customer_dob, customer_id_number, etc. Returns per-tx xgboost_prob, risk_level and a summary."""
         data = None
         s = (transactions_json or "").strip()
         if not s or s.lower() == "use last result":
