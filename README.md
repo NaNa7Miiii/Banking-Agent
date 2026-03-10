@@ -1,4 +1,4 @@
-# Banking Agent (Reorg)
+# Banking Agent
 
 Agentic workflow for banking operations, built with LangGraph. A single runtime graph runs the **planner**, **orchestrator**, and **subagents** (SQL, RAG, Fraud) from user input to final answer, with Redis-backed conversation memory.
 
