@@ -1,22 +1,22 @@
 # Banking Agent (Reorg)
 
-Agentic workflow for banking operations, built with LangGraph. A single runtime graph runs the **planner**, **orchestrator**, and **subagents** (SQL, RAG, Fraud) from user input to final answer, with optional Redis-backed conversation memory.
+Agentic workflow for banking operations, built with LangGraph. A single runtime graph runs the **planner**, **orchestrator**, and **subagents** (SQL, RAG, Fraud) from user input to final answer, with Redis-backed conversation memory.
 
 ## Features
 
 - **Planner** – Turns user questions into a structured multi-step plan (goal, steps with owner and dependencies).
-- **Runtime graph** – One graph: planner → init → select → execute (concurrent waves) → merge → evaluate → aggregate; optional replan on failure.
+- **Runtime graph** – One graph: planner → init → select → execute (concurrent waves) → merge → evaluate → aggregate; replan on failure when needed.
 - **SQL Agent** – Read-only queries with pairwise candidate selection and safe execution layer.
-- **RAG Agent** – Vector search (Pinecone) and optional Tavily web search (gated for public/policy queries only).
+- **RAG Agent** – Vector search (Pinecone) and Tavily web search (gated for public/policy queries only).
 - **Fraud Agent** – ML-based transaction fraud/risk scoring.
-- **Conversation memory** – Redis-backed history (optional) for multi-turn context.
+- **Conversation memory** – Redis-backed history for multi-turn context.
 
 ## Prerequisites
 
 - Python 3.10+
-- Docker (optional, for Redis)
-- PostgreSQL (for transaction DB)
-- API keys: OpenAI (required); Pinecone, Tavily (optional, for RAG and web search).
+- Docker (for Redis)
+- PostgreSQL (transaction DB)
+- API keys: OpenAI, Pinecone, Tavily
 
 ## Installation
 
@@ -39,7 +39,7 @@ Agentic workflow for banking operations, built with LangGraph. A single runtime 
 
 ## Setting Up Redis with Docker
 
-Redis is used for conversation memory. It is optional; if Redis is unavailable, the app runs without history.
+Redis backs conversation memory for multi-turn context.
 
 ### Using Docker to Run Redis
 
@@ -56,7 +56,7 @@ Redis is used for conversation memory. It is optional; if Redis is unavailable, 
    docker ps
    ```
 
-3. **Test connection** (optional)
+3. **Test connection**
    ```bash
    docker exec -it redis-banking-agent redis-cli ping
    # Should return: PONG
@@ -77,10 +77,8 @@ Defaults are in `src/utils/memory.py` (e.g. `localhost:6379`). Override via env 
 Create a `.env` file at the **project root** (e.g. `Banking_Agent_reorg/.env`):
 
 ```env
-# Required for LLM
 OPENAI_API_KEY=your-openai-api-key
 
-# Database (for SQL agent)
 DB_HOST=your-database-host
 DB_PASSWORD=your-database-password
 DB_USERNAME=postgres
@@ -88,11 +86,9 @@ DB_PORT=5432
 DB_DATABASE=customer_transaction_db
 DB_TABLE_NAME=transactions
 
-# Optional: RAG & web search
 PINECONE_API_KEY=your-pinecone-api-key
 TAVILY_SEARCH_KEY=your-tavily-api-key
 
-# Optional: Redis (conversation memory)
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```
@@ -109,7 +105,7 @@ python -m src.run "How much did I spend this month?"
 python -m src.run "What is the overdraft policy?" [customer_id] [session_id]
 ```
 
-With `customer_id` and `session_id`, conversation memory is used when Redis is available.
+With `customer_id` and `session_id`, conversation memory is used.
 
 ### Using as a Python module
 
