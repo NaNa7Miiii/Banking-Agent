@@ -1,6 +1,7 @@
 """
 SQL agent using LangChain create_agent (tool-calling loop). Preserves same API and return shape.
 """
+import time
 from typing import Any
 
 from langchain.agents import create_agent
@@ -38,6 +39,7 @@ def run_sql_agent_react(
     propose_sql, execute_sql, fix_sql) in a tool-calling loop; then extract answer and
     sql/result/error from collector.
     """
+    time.sleep(0.5)  # Space out from caller (e.g. fraud agent) to reduce 429
     engine = get_engine()
     table_name = get_table_name()
     tools, collector = make_sql_tools(

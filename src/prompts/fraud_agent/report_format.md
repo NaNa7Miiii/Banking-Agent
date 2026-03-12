@@ -13,4 +13,7 @@ Structure the report as follows:
 3. **Next steps**  
    Concrete actions: e.g. contact customer service, freeze card, outbound call to verify, or no action.
 
+4. **Fraud transaction list**  
+   Output exactly the placeholder (do not fill it yourself): `{{FRAUD_TRANSACTION_LIST}}`. The system will replace it with the model-predicted high-risk transaction list or None.
+
 Rules: Use only data returned by the tools; do not invent scores or transaction details. If no transactions were found or scoring failed, say so clearly in the report.

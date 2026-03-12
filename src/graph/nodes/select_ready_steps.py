@@ -1,7 +1,7 @@
 """
-Select ready steps: recompute completed/failed from step_results and normalized_steps;
+Select ready steps: recompute completed/failed from step_results (single source of truth);
 then compute ready_step_ids (todo steps whose depends_on are all in completed_step_ids).
-Phase 2: group by parallel_group; emit one full group as wave, or one ungrouped step.
+normalized_steps.status is cache/display only; use reconcile_step_status() as the single place to write it.
 """
 from typing import Any
 
@@ -9,21 +9,58 @@ from src.graph.executor.schema import StepResult
 from src.graph.runtime_state import RuntimeState
 
 
+def _dep_step_id(dep: Any) -> str:
+    """Extract step_id from depends_on item (dict with step_id or plain string)."""
+    if isinstance(dep, dict):
+        return (dep.get("step_id") or dep.get("step") or "").strip()
+    if isinstance(dep, str):
+        return (dep or "").strip()
+    return ""
+
+
+def reconcile_step_status(
+    normalized_steps: list[dict[str, Any]],
+    step_results: dict[str, StepResult],
+) -> list[dict[str, Any]]:
+    """
+    Single point to write normalized_steps.status from step_results (source of truth).
+    ok -> done, error -> failed, no result -> todo. Returns new list; does not mutate input.
+    """
+    out: list[dict[str, Any]] = []
+    for step in normalized_steps:
+        s = dict(step)
+        step_id = (s.get("id") or "").strip()
+        if not step_id:
+            out.append(s)
+            continue
+        sr = step_results.get(step_id) or {}
+        st = (sr.get("status") or "").strip().lower()
+        if st == "ok":
+            s["status"] = "done"
+        elif st == "error":
+            s["status"] = "failed"
+        else:
+            s["status"] = "todo"
+        out.append(s)
+    return out
+
+
 def _recompute_completed_failed(
     normalized_steps: list[dict[str, Any]],
     step_results: dict[str, StepResult],
 ) -> tuple[list[str], list[str]]:
-    """Derive completed_step_ids and failed_step_ids from truth (step_results, normalized_steps)."""
+    """Derive completed_step_ids and failed_step_ids from step_results only (source of truth)."""
     completed: list[str] = []
     failed: list[str] = []
     for step in normalized_steps:
-        step_id = step.get("id") or ""
+        step_id = (step.get("id") or "").strip()
         if not step_id:
             continue
-        status = step.get("status") or ""
-        if status == "done" or (step_results.get(step_id) or {}).get("status") == "ok":
+        sr = step_results.get(step_id) or {}
+        st = (sr.get("status") or "").strip().lower()
+        if st == "ok":
             completed.append(step_id)
-        elif status == "failed" or (step_results.get(step_id) or {}).get("status") == "error":
+        elif st == "error":
             failed.append(step_id)
     return completed, failed
 
@@ -31,7 +68,7 @@ def _recompute_completed_failed(
 def select_ready_steps_node(state: RuntimeState) -> RuntimeState:
     """
     Recompute completed_step_ids, failed_step_ids; then compute ready_step_ids.
-    Phase 2: steps with same non-null parallel_group run together only when the whole group is ready.
+    Steps with same non-null parallel_group run together only when the whole group is ready.
     If a full group is ready, wave = that group; else wave = one ready step without a group (or first ready).
     """
     normalized_steps = state.get("normalized_steps") or []
@@ -39,16 +76,17 @@ def select_ready_steps_node(state: RuntimeState) -> RuntimeState:
 
     completed, failed = _recompute_completed_failed(normalized_steps, step_results)
     completed_set = set(completed)
+    failed_set = set(failed)
 
-    # All step_ids that are todo and deps satisfied
+    # All step_ids that are todo (not in completed/failed per step_results) and deps satisfied
     ready_set: set[str] = set()
     ready_candidates: list[tuple[str, str | None]] = []  # (step_id, parallel_group or None)
     for step in normalized_steps:
-        if (step.get("status") or "") != "todo":
+        step_id = (step.get("id") or "").strip()
+        if not step_id or step_id in completed_set or step_id in failed_set:
             continue
-        step_id = step.get("id") or ""
         deps = step.get("depends_on") or []
-        if all((d.get("step_id") or "") in completed_set for d in deps):
+        if all(_dep_step_id(d) in completed_set for d in deps):
             pg = step.get("parallel_group")
             pg_val = pg.strip() if isinstance(pg, str) and pg.strip() else None
             ready_candidates.append((step_id, pg_val))
@@ -58,7 +96,7 @@ def select_ready_steps_node(state: RuntimeState) -> RuntimeState:
     from collections import defaultdict
     group_to_all_ids: dict[str, list[str]] = defaultdict(list)
     for step in normalized_steps:
-        step_id = step.get("id") or ""
+        step_id = (step.get("id") or "").strip()
         pg = step.get("parallel_group")
         if isinstance(pg, str) and pg.strip():
             group_to_all_ids[pg.strip()].append(step_id)

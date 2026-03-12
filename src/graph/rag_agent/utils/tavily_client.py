@@ -1,5 +1,5 @@
 """
-Tavily search wrapper. Env: TAVILY_API_KEY or TAVILY_SEARCH_KEY. No dependency on src.
+Tavily search wrapper. Env: TAVILY_API_KEY or TAVILY_SEARCH_KEY.
 """
 from typing import Any
 

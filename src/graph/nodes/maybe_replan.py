@@ -1,9 +1,10 @@
 """
 Maybe replan: if should_replan, increment replan_count and (full) call planner with replan context,
 merge new remaining plan with completed steps, preserve step_results for completed only; then route to init_orchestration.
-Phase 3: replace-remaining only; always routes to init_orchestration.
+P0-3: Step id conflict resolution (rename new steps that clash with completed), DAG/ref validation after merge.
 """
 import json
+import logging
 from typing import Any
 
 from src.graph.runtime_state import RuntimeState
@@ -12,6 +13,7 @@ from src.utils.prompt_loader import load_system_prompt
 from src.graph.executor.router import get_canonical
 
 
+logger = logging.getLogger(__name__)
 PLANNER_MODULE = "planner"
 
 
@@ -66,6 +68,114 @@ def _call_replan_llm(user_message: str) -> dict[str, Any]:
     return _parse_plan_json(raw)
 
 
+def _extract_dep_step_id(dep: Any) -> str:
+    if isinstance(dep, str):
+        return (dep or "").strip()
+    if isinstance(dep, dict):
+        return (dep.get("step_id") or dep.get("step") or "").strip()
+    return ""
+
+
+def _resolve_replan_step_id_conflicts(
+    new_steps: list[dict[str, Any]],
+    completed_step_ids: set[str],
+    replan_count: int,
+) -> list[dict[str, Any]]:
+    """
+    Hard rule: completed steps cannot be overwritten. Rename any new step whose id
+    is in completed_step_ids to replan_{replan_count}_step_{i+1}; update depends_on in new_steps to use new ids.
+    """
+    out: list[dict[str, Any]] = []
+    id_rewrite: dict[str, str] = {}
+    for i, step in enumerate(new_steps):
+        s = dict(step)
+        step_id = (s.get("id") or "").strip()
+        new_id = step_id
+        if step_id and step_id in completed_step_ids:
+            new_id = f"replan_{replan_count}_step_{i + 1}"
+            id_rewrite[step_id] = new_id
+        s["id"] = new_id
+        out.append(s)
+    if not id_rewrite:
+        return out
+    for s in out:
+        deps = s.get("depends_on") or []
+        new_deps = []
+        for d in deps:
+            dep_id = _extract_dep_step_id(d)
+            new_id = id_rewrite.get(dep_id, dep_id)
+            if isinstance(d, dict):
+                new_deps.append({**d, "step_id": new_id} if "step_id" in d else {"step_id": new_id})
+            else:
+                new_deps.append(new_id)
+        s["depends_on"] = new_deps
+    return out
+
+
+def _validate_merged_plan(merged_steps: list[dict[str, Any]], plan: dict[str, Any]) -> tuple[bool, str]:
+    """
+    DAG and reference integrity: all depends_on refer to existing step ids; join_points refer to existing groups/steps; no cycle.
+    Returns (ok, error_message).
+    """
+    step_ids = {(s.get("id") or "").strip() for s in merged_steps if (s.get("id") or "").strip()}
+    if len(step_ids) != sum(1 for s in merged_steps if (s.get("id") or "").strip()):
+        return False, "Duplicate step ids in merged plan"
+
+    for step in merged_steps:
+        step_id = (step.get("id") or "").strip()
+        if not step_id:
+            continue
+        for dep in step.get("depends_on") or []:
+            dep_id = _extract_dep_step_id(dep)
+            if dep_id and dep_id not in step_ids:
+                return False, f"Step {step_id} depends_on missing step_id: {dep_id}"
+
+    join_points = plan.get("join_points") or []
+    group_ids = set()
+    for s in merged_steps:
+        pg = s.get("parallel_group")
+        if isinstance(pg, str) and pg.strip():
+            group_ids.add(pg.strip())
+    for jp in join_points:
+        apg = (jp.get("after_parallel_group") or "").strip()
+        if apg and apg not in group_ids:
+            return False, f"join_point after_parallel_group not found: {apg}"
+        merge_ids = jp.get("merge_artifacts_from_steps") or []
+        for mid in merge_ids:
+            mid = (mid if isinstance(mid, str) else str(mid)).strip()
+            if mid and mid not in step_ids:
+                return False, f"join_point merge_artifacts_from_steps references missing step: {mid}"
+
+    # DAG: no cycle (toposort). in_degree[x] = number of steps that have x in depends_on (edges into x)
+    from collections import deque
+    in_degree: dict[str, int] = {sid: 0 for sid in step_ids}
+    for step in merged_steps:
+        step_id = (step.get("id") or "").strip()
+        for dep in step.get("depends_on") or []:
+            dep_id = _extract_dep_step_id(dep)
+            if dep_id in step_ids:
+                in_degree[dep_id] = in_degree.get(dep_id, 0) + 1
+    q: deque[str] = deque(sid for sid in step_ids if in_degree[sid] == 0)
+    seen = 0
+    while q:
+        n = q.popleft()
+        seen += 1
+        for step in merged_steps:
+            if (step.get("id") or "").strip() != n:
+                continue
+            for dep in step.get("depends_on") or []:
+                dep_id = _extract_dep_step_id(dep)
+                if dep_id in step_ids:
+                    in_degree[dep_id] -= 1
+                    if in_degree[dep_id] == 0:
+                        q.append(dep_id)
+            break
+    if seen != len(step_ids):
+        return False, "Cycle or invalid dependency in merged plan steps"
+
+    return True, ""
+
+
 def maybe_replan_node(state: RuntimeState) -> RuntimeState:
     """
     If not should_replan: no-op (return {}).
@@ -76,7 +186,8 @@ def maybe_replan_node(state: RuntimeState) -> RuntimeState:
     if not state.get("should_replan"):
         return {}
 
-    replan_count = (state.get("replan_count") or 0) + 1
+    # Only increment replan_count when we successfully apply a merged plan (not on LLM or validation failure)
+    current_replan_count = state.get("replan_count") or 0
     plan = state.get("plan") or {}
     normalized_steps = state.get("normalized_steps") or []
     step_results = state.get("step_results") or {}
@@ -85,11 +196,10 @@ def maybe_replan_node(state: RuntimeState) -> RuntimeState:
     replan_reason = state.get("replan_reason") or "step failed"
     user_input = state.get("user_input") or (plan.get("goal") or "")
 
-    # Placeholder: no planner call; just increment replan_count and pass through (init will preserve step_results).
-    use_full_replan = True  # Set to False for placeholder-only behavior
+    use_full_replan = True
     if not use_full_replan:
         return {
-            "replan_count": replan_count,
+            "replan_count": current_replan_count,
         }
 
     # Full replan: build context and call replan LLM (StepResult has data.summary, data.artifacts)
@@ -111,24 +221,32 @@ def maybe_replan_node(state: RuntimeState) -> RuntimeState:
     try:
         new_plan = _call_replan_llm(user_message)
     except Exception:
-        # On LLM/parse failure, behave like placeholder: only increment and re-enter init with same plan
-        return {"replan_count": replan_count}
+        # On LLM/parse failure, re-enter init with same plan without consuming a replan attempt
+        return {"replan_count": current_replan_count}
 
     new_steps = new_plan.get("steps") or []
     new_steps = _normalize_replan_steps(new_steps)
-    completed_step_dicts = [dict(s) for s in normalized_steps if (s.get("id") or "") in completed_step_ids]
-    for d in completed_step_dicts:
-        d["status"] = "done"
+    # P0-3: completed steps cannot be overwritten; rename new steps that conflict with completed ids
+    new_steps = _resolve_replan_step_id_conflicts(new_steps, completed_step_ids, current_replan_count + 1)
+
+    completed_step_dicts = [dict(s) for s in normalized_steps if (s.get("id") or "").strip() in completed_step_ids]
     merged_steps = completed_step_dicts + new_steps
     merged_plan = {
         **plan,
         "goal": new_plan.get("goal") or plan.get("goal"),
         "steps": merged_steps,
     }
+
+    # P0-3: DAG and reference integrity validation
+    ok, err = _validate_merged_plan(merged_steps, merged_plan)
+    if not ok:
+        logger.warning("Replan validation failed: %s. Re-entering init with same plan.", err)
+        return {"replan_count": current_replan_count}
+
     step_results_kept = {k: v for k, v in step_results.items() if k in completed_step_ids}
 
     return {
         "plan": merged_plan,
         "step_results": step_results_kept,
-        "replan_count": replan_count,
+        "replan_count": current_replan_count + 1,
     }

@@ -2,7 +2,12 @@
 Fraud agent tools: get_transactions_via_sql (calls SQL agent), analyze_risk_scores_batch, query_customer_profile.
 """
 import json
+import time
 from typing import Any
+
+# Short delay before tool runs to space out API calls and reduce 429 (each tool can trigger more LLM/API)
+SLEEP_BEFORE_SQL_TOOL = 1.0
+SLEEP_BEFORE_OTHER_TOOL = 0.5
 
 from langchain_core.tools import tool
 
@@ -35,6 +40,7 @@ def make_fraud_tools(current_user_id: str) -> tuple[list, dict[str, Any]]:
             if len(rows) > 50:
                 summary += f"\n... {len(rows)} rows total; use analyze_risk_scores_batch with input 'use last result' to score."
             return f"Transaction data from the previous step is already loaded ({len(rows)} rows). Call analyze_risk_scores_batch with input 'use last result' to score it.\nSummary:\n{summary[:4000]}"
+        time.sleep(SLEEP_BEFORE_SQL_TOOL)
         out = run_sql_agent(question=question, current_user_id=current_user_id)
         collector["sql_answer"] = out.get("answer", "")
         collector["sql_result"] = out.get("result")
@@ -78,6 +84,7 @@ def make_fraud_tools(current_user_id: str) -> tuple[list, dict[str, Any]]:
         if not data:
             collector["risk_scores"] = {"results": [], "summary": "Transaction list is empty."}
             return "Transaction list is empty. Call get_transactions_via_sql first, then score."
+        time.sleep(SLEEP_BEFORE_OTHER_TOOL)
         result = run_batch_risk_scores(data)
         collector["risk_scores"] = result
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -85,6 +92,7 @@ def make_fraud_tools(current_user_id: str) -> tuple[list, dict[str, Any]]:
     @tool
     def query_customer_profile(cc_num: str) -> str:
         """Look up the customer profile for the given card number: home city, age, average ticket size, common categories. Input is the card number (e.g. current user's)."""
+        time.sleep(SLEEP_BEFORE_OTHER_TOOL)
         profile = get_customer_profile(cc_num)
         collector["profile"] = profile
         return json.dumps(profile, ensure_ascii=False)

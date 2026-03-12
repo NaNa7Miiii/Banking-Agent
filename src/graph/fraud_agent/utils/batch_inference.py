@@ -129,7 +129,6 @@ def run_batch_risk_scores(
 
 
 if __name__ == "__main__":
-    # Quick sanity check: rows with Series/numpy must become native (avoids unhashable type: 'Series')
     row_with_series = {
         "transaction_id": 1,
         "amount": np.float64(10.5),

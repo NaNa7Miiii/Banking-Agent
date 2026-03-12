@@ -1,6 +1,6 @@
 """
 Evaluate progress: set should_aggregate, should_replan, replan_reason.
-Phase 3: failure policy — if any step failed and replan_count < max_replan → should_replan; else → should_aggregate (incl. partial).
+If any step failed and replan_count < max_replan → should_replan; else → should_aggregate (incl. partial).
 """
 from src.graph.runtime_state import RuntimeState
 from src.graph.nodes.select_ready_steps import _recompute_completed_failed
@@ -21,11 +21,8 @@ def evaluate_progress_node(state: RuntimeState) -> RuntimeState:
 
     completed, failed = _recompute_completed_failed(normalized_steps, step_results)
     failed_set = set(failed)
-    all_done = not any(
-        (s.get("status") or "").lower() == "todo"
-        for s in normalized_steps
-        if s.get("id")
-    )
+    step_ids = {(s.get("id") or "").strip() for s in normalized_steps if (s.get("id") or "").strip()}
+    all_done = step_ids <= (set(completed) | set(failed)) if step_ids else True
     if all_done:
         return {
             "completed_step_ids": completed,

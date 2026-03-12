@@ -1,5 +1,4 @@
 """
-Fraud agent config: model paths (fraud_detection output), no dependency on src.
 Pipeline uses XGBoost from fraud_detection/ml_model/ (saved by 08_xgboost_benchmark.ipynb).
 """
 from pathlib import Path

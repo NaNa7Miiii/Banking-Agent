@@ -8,6 +8,7 @@ from typing import Any
 
 from src.graph.executor.schema import StepResult
 from src.graph.runtime_state import RuntimeState
+from src.graph.nodes.select_ready_steps import reconcile_step_status
 
 
 def _merge_artifacts_and_summary(
@@ -89,7 +90,8 @@ def merge_step_results_node(state: RuntimeState) -> RuntimeState:
         "metadata": {"agent": "join", "owner": "join", "timestamp": time.time()},
     }
     step_results[synthetic_id] = synthetic_result
-    normalized_steps.append({"id": synthetic_id, "status": "done"})
+    normalized_steps.append({"id": synthetic_id})
+    normalized_steps = reconcile_step_status(normalized_steps, step_results)
 
     return {
         "step_results": step_results,

@@ -8,6 +8,7 @@ from typing import Any
 
 from src.graph.executor import execute_step, ExecutionContext
 from src.graph.runtime_state import RuntimeState
+from src.graph.nodes.select_ready_steps import reconcile_step_status
 from src.utils.env import get_env
 
 # Max concurrent steps per wave (parallel group or multi-step wave). Override with env MAX_CONCURRENT_STEPS.
@@ -101,11 +102,9 @@ def execute_ready_steps_node(state: RuntimeState) -> RuntimeState:
 
     for step_id, result in results_by_id.items():
         step_results[step_id] = result
-        status = "done" if (result.get("status") == "ok") else "failed"
-        for i, s in enumerate(normalized_steps):
-            if (s.get("id") or "") == step_id:
-                normalized_steps[i] = {**s, "status": status}
-                break
+
+    # Single write-back of status: step_results is source of truth; reconcile for display/cache
+    normalized_steps = reconcile_step_status(normalized_steps, step_results)
 
     return {
         "step_results": step_results,

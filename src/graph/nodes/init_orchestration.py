@@ -5,7 +5,7 @@ Called after planner; after replan (maybe_replan) re-enters with existing step_r
 from typing import Any
 
 from src.graph.runtime_state import RuntimeState
-from src.graph.nodes.select_ready_steps import _recompute_completed_failed
+from src.graph.nodes.select_ready_steps import _recompute_completed_failed, reconcile_step_status
 
 
 def init_orchestration_node(state: RuntimeState) -> RuntimeState:
@@ -34,15 +34,9 @@ def init_orchestration_node(state: RuntimeState) -> RuntimeState:
     replan_count = state.get("replan_count") or 0
     is_replan_reentry = bool(existing_step_results) and replan_count > 0
 
-    normalized_steps: list[dict[str, Any]] = []
-    for s in steps:
-        step = dict(s)
-        if step.get("status") is None:
-            if is_replan_reentry and (existing_step_results.get(step.get("id")) or {}).get("status") == "ok":
-                step["status"] = "done"
-            else:
-                step["status"] = "todo"
-        normalized_steps.append(step)
+    normalized_steps = [dict(s) for s in steps]
+    # Single write-back: status from step_results only (source of truth)
+    normalized_steps = reconcile_step_status(normalized_steps, existing_step_results)
 
     execution_context: dict[str, Any] = state.get("execution_context") or {
         "current_user_id": state.get("customer_id_number") or "",

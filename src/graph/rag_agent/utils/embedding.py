@@ -1,5 +1,5 @@
 """
-Pinecone client and hybrid embeddings (dense + sparse). No dependency on src.
+Pinecone client and hybrid embeddings (dense + sparse).
 """
 from typing import Any
 

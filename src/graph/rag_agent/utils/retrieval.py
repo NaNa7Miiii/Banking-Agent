@@ -1,5 +1,5 @@
 """
-Hybrid retrieval (dense + sparse) and rerank. No dependency on src.
+Hybrid retrieval (dense + sparse) and rerank.
 """
 from typing import Any
 

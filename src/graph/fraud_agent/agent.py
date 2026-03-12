@@ -1,6 +1,8 @@
 """
 Fraud agent using LangChain create_agent: tools (get_transactions_via_sql, analyze_risk_scores_batch, query_customer_profile).
+Final report: {{FRAUD_TRANSACTION_LIST}} in the LLM output is replaced by the model-predicted high-risk transaction list (variable insertion).
 """
+import time
 from typing import Any
 
 from langchain.agents import create_agent
@@ -12,6 +14,34 @@ from src.graph.fraud_agent.utils.prompts import agent_system
 from src.models.llm import get_create_agent_model_string
 
 load_env()
+
+PLACEHOLDER_FRAUD_LIST = "{{FRAUD_TRANSACTION_LIST}}"
+
+
+def _build_fraud_list_str(collector: dict[str, Any]) -> str:
+    """
+    Build the string to insert for {{FRAUD_TRANSACTION_LIST}}: model-predicted high-risk transactions
+    from risk_scores.results + full rows from sql_result. If none, return "None".
+    """
+    risk_scores = collector.get("risk_scores") or {}
+    results_list = risk_scores.get("results") or []
+    high_risk_ids = {str(r.get("transaction_id") or "") for r in results_list if (r.get("risk_level") or "").strip().lower() == "high"}
+    if not high_risk_ids:
+        return "None"
+    sql_result = collector.get("sql_result") or []
+    fraud_rows = [row for row in sql_result if str(row.get("transaction_id") or row.get("trans_num") or "") in high_risk_ids]
+    if not fraud_rows:
+        return "None"
+    lines = []
+    for row in fraud_rows:
+        lines.append("---")
+        for k, v in row.items():
+            if v is None:
+                lines.append(f"{k}:")
+            else:
+                s = v.isoformat() if hasattr(v, "isoformat") and callable(getattr(v, "isoformat", None)) else str(v)
+                lines.append(f"{k}: {s}")
+    return "\n".join(lines)
 
 
 def _last_ai_content(messages: list) -> str:
@@ -43,6 +73,8 @@ def run_fraud_agent_react(
     if initial_sql_answer is not None:
         collector["sql_answer"] = initial_sql_answer
 
+    # Short delay before first LLM call to avoid burst 429 when many cases run in sequence
+    time.sleep(0.5)
     graph = create_agent(
         model=get_create_agent_model_string("fraud"),
         tools=tools,
@@ -63,11 +95,14 @@ def run_fraud_agent_react(
         result = graph.invoke(inputs)
         messages = result.get("messages", [])
         analysis = _last_ai_content(messages)
-        state["analysis"] = analysis or "Could not generate analysis report."
         state["risk_scores"] = collector.get("risk_scores")
         state["profile"] = collector.get("profile")
         state["sql_answer"] = collector.get("sql_answer")
         state["sql_result"] = collector.get("sql_result")
+        # Variable insertion: replace placeholder with model-predicted fraud list
+        fraud_list_str = _build_fraud_list_str(collector)
+        final_analysis = (analysis or "Could not generate analysis report.").replace(PLACEHOLDER_FRAUD_LIST, fraud_list_str)
+        state["analysis"] = final_analysis
     except Exception as e:
         state["error"] = str(e)
         state["analysis"] = "Fraud analysis failed; please try again later."

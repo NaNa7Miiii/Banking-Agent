@@ -1,5 +1,5 @@
 """
-Load RAG agent prompts from prompts/rag_agent. No dependency on src.
+Load RAG agent prompts from prompts/rag_agent.
 """
 from src.utils.prompt_loader import load_system_prompt
 

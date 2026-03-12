@@ -1,5 +1,5 @@
 """
-Routing: local confidence threshold -> local_only / web / both / refuse. No dependency on src.
+Routing: local confidence threshold -> local_only / web / both / refuse.
 """
 from typing import Literal
 
