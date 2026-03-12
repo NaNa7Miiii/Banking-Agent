@@ -17,7 +17,7 @@ from src.graph.sql_agent.utils.generators import (
     generate_direct_candidates,
     generate_dc_candidate,
 )
-from src.graph.sql_agent.utils.execution import execute_read_only_sql
+from src.graph.sql_agent.utils.execution import execute_read_only_sql, validate_sql_pre_execution
 from src.graph.sql_agent.utils.fixer import query_fixer
 from src.graph.sql_agent.selection import pairwise_select
 
@@ -125,6 +125,12 @@ def make_sql_tools(
     @tool
     def execute_sql(sql: str) -> str:
         """Run a read-only SQL query. Pass the exact SQL string. Returns result summary or error."""
+        ok, validation_err = validate_sql_pre_execution(sql, USER_COLUMN)
+        if not ok:
+            collector["sql"] = sql
+            collector["result"] = None
+            collector["error"] = validation_err
+            return f"Error: {validation_err}"
         rows, err, truncated = execute_read_only_sql(
             engine, sql, current_user_id, USER_COLUMN, FORBIDDEN_COLUMNS
         )

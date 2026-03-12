@@ -21,6 +21,22 @@ FORBIDDEN_PATTERN = re.compile(
 )
 # Match LIMIT clause (e.g. LIMIT 100 or LIMIT 10 OFFSET 5)
 LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(:\w+|\d+)\b", re.IGNORECASE)
+# SELECT * forbidden (pre-execution policy)
+SELECT_STAR_PATTERN = re.compile(r"\bSELECT\s+\*\s+", re.IGNORECASE)
+
+
+def validate_sql_pre_execution(sql: str, user_column: str) -> tuple[bool, str]:
+    """
+    Pre-execution checks: forbid SELECT *, require user filter in SQL.
+    Returns (ok, error_message). If not ok, caller should not execute.
+    """
+    if not (sql or "").strip():
+        return False, "SQL is empty."
+    if SELECT_STAR_PATTERN.search(sql):
+        return False, "SELECT * is not allowed; list required columns explicitly."
+    if not re.search(rf"\b{re.escape(user_column)}\b", sql, re.IGNORECASE):
+        return False, f"Query must filter by {user_column} (e.g. WHERE {user_column} = :uid)."
+    return True, ""
 
 
 def _normalize_user_filter(sql: str, user_column: str) -> str:

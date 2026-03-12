@@ -44,8 +44,43 @@ def _build_result(
 
 def _run_sql(step: dict[str, Any], context: ExecutionContext) -> StepResult:
     from src.graph.sql_agent.pipeline import run_sql_agent
+    from src.graph.sql_agent.utils.transaction_template import (
+        _instruction_looks_like_transaction_retrieval,
+        _parse_date_range,
+        run_transaction_retrieval_template,
+    )
+    from src.utils.db import get_engine
+    from src.graph.sql_agent.config import get_table_name
+
     instruction = _instruction_from_step(step)
     user_id = context.get("current_user_id") or ""
+
+    if user_id and _instruction_looks_like_transaction_retrieval(instruction):
+        start_end = _parse_date_range(instruction)
+        if start_end:
+            start_date, end_date = start_end
+            engine = get_engine()
+            table_name = get_table_name()
+            rows, err, truncated = run_transaction_retrieval_template(
+                engine, table_name, user_id, start_date, end_date
+            )
+            if err:
+                return _build_result(
+                    step, "error", "",
+                    artifacts={"sql": None, "result": None},
+                    error_message=err,
+                    agent_name="sql_agent",
+                )
+            summary = f"Retrieved {len(rows)} transaction(s)."
+            if truncated:
+                summary += " (Capped at 1000 rows.)"
+            return _build_result(
+                step, "ok", summary,
+                artifacts={"sql": "(transaction retrieval template)", "result": rows},
+                error_message="",
+                agent_name="sql_agent",
+            )
+
     out = run_sql_agent(question=instruction, current_user_id=user_id)
     status = "ok" if not out.get("error") else "error"
     summary = (out.get("answer") or "").strip() if status == "ok" else ""
