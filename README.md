@@ -22,8 +22,8 @@ Agentic workflow for banking operations, built with LangGraph. A single runtime 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/NaNa7Miiii/Banking_Agent.git
-   cd Banking_Agent/Banking_Agent_reorg
+   git clone -b reorg https://github.com/NaNa7Miiii/Banking_Agent.git
+   cd Banking_Agent
    ```
 
 2. **Create and activate virtual environment**
@@ -97,12 +97,14 @@ REDIS_PORT=6379
 
 ### Run from project root
 
-Run from the **repository root** so that `python -m src.run` resolves (e.g. from `Banking_Agent_reorg` if that is your working directory):
+Run from the **repository root** so that `python -m src.run` resolves:
 
 ```bash
-# From Banking_Agent_reorg/
+# Basic usage
 python -m src.run "How much did I spend this month?"
-python -m src.run "What is the overdraft policy?" [customer_id] [session_id]
+
+# With memory (customer_id_number + session_id)
+python -m src.run "What is the overdraft policy?" "12345" "session-abc"
 ```
 
 With `customer_id` and `session_id`, conversation memory is used.
