@@ -17,6 +17,14 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from src.graph.runtime_graph import create_runtime_graph
+from src.utils.env import load_env
+from src.utils.langfuse_client import (
+    set_langfuse_handler,
+    get_langfuse_config,
+    flush as langfuse_flush,
+)
+
+load_env()
 
 
 def run_task(
@@ -57,8 +65,17 @@ def run_task(
         "plan": None,
     }
 
+    set_langfuse_handler(
+        session_id=session_id or "demo-session",
+        user_id=customer_id_number or "demo-user",
+        trace_name=f"banking-query: {user_input[:60]}",
+    )
+
     graph = create_runtime_graph()
-    result = graph.invoke(initial)
+    invoke_config: dict = {"recursion_limit": 100}
+    invoke_config.update(get_langfuse_config())
+    result = graph.invoke(initial, config=invoke_config)
+    langfuse_flush()
     plan = result.get("plan")
     result["execution_state"] = {
         "plan": plan,

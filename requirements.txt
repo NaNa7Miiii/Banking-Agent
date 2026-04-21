@@ -4,53 +4,43 @@ langgraph>=0.0.40
 langchain-openai>=0.0.5
 langchain-community>=0.0.20
 langchain-classic>=1.0.0  # For ConversationSummaryBufferMemory
-langchain-text-splitters>=0.0.1  # For text splitting in RAG
 
 # LLM & Embeddings
 openai>=1.10.0
 
-# Vector Database
+# Vector Database (RAG)
 pinecone>=3.0.0
 
 # Search & Research
-tavily-python>=0.7.0  # For web search functionality
+tavily-python>=0.7.0
 
-# AWS SDK (for S3/RDS data access)
-boto3>=1.34.0
-
-# Data Processing & EDA
+# Data Processing
 pandas>=2.0.0
 numpy>=1.24.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
 
-# ML (XGBoost + Kaggle dataset)
+# ML (Fraud Agent)
 xgboost>=2.0.0
 scikit-learn>=1.3.0
 joblib>=1.3.0
-kagglehub[pandas-datasets]>=0.2.0
 
 # Configuration & Environment
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 
-# Optional: Database (if using RDS instead of S3)
+# Database (Postgres / AWS RDS)
 sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.0  # PostgreSQL driver (if using RDS)
+psycopg2-binary>=2.9.0
 
-# Optional: Web API (if you want to expose as API service)
+# Web API
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
-# RAG evaluation (DeepEval)
-deepeval>=0.21.0
-
-# Entity / keyword extraction (multi-retrieval)
-spacy>=3.7.0
-
 # Utilities
-python-dateutil>=2.8.0  # For date parsing
-redis>=5.0.0  # For conversation memory storage
-jsonschema>=4.20.0  # refactored: validate planner output against output_schema.json
-pyyaml>=6.0  # refactored: prompt meta.yaml loading (optional in prompt_loader)
+python-dateutil>=2.8.0
+redis>=5.0.0
+jsonschema>=4.20.0
+pyyaml>=6.0
+
+# Observability / Tracing
+langfuse>=2.0.0

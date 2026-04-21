@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.engine import Engine
 
 from src.utils.db import run_read_only
+from src.utils.json_safe import to_json_safe
 from src.graph.sql_agent.config import get_default_sql_limit, get_max_sql_rows
 
 
@@ -124,7 +125,7 @@ def execute_read_only_sql(
     for i, row in enumerate(rows):
         if i >= max_rows:
             break
-        r = {k: v for k, v in row.items() if k not in forbidden_columns}
+        r = {k: to_json_safe(v) for k, v in row.items() if k not in forbidden_columns}
         out.append(r)
     truncated = len(out) >= max_rows
     return out, None, truncated

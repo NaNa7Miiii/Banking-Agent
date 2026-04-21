@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Banking Agent · Demo</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%230f172a'/><text x='50%25' y='56%25' font-size='32' text-anchor='middle' fill='%2338bdf8' font-family='sans-serif' font-weight='700'>B</text></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a33;
+      --panel-2: #1a2447;
+      --ink: #e6ecff;
+      --ink-dim: #8ea0c9;
+      --accent: #38bdf8;
+      --accent-2: #6366f1;
+      --ok: #22c55e;
+      --err: #ef4444;
+      --border: #25304f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; min-height: 100vh; }
+    body { background: radial-gradient(1200px 600px at 10% -10%, rgba(56,189,248,0.15), transparent 60%), radial-gradient(1000px 500px at 120% 10%, rgba(99,102,241,0.18), transparent 60%), var(--bg); }
+    header { max-width: 900px; margin: 0 auto; padding: 32px 24px 12px; }
+    header h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+    header p { margin: 0; color: var(--ink-dim); font-size: 14px; }
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .card { background: rgba(18, 26, 51, 0.75); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-top: 16px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row input, .row textarea { flex: 1; min-width: 0; background: var(--panel-2); color: var(--ink); border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; font-size: 14px; font-family: inherit; resize: vertical; }
+    .row textarea { min-height: 70px; }
+    .row input:focus, .row textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56,189,248,0.15); }
+    button { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #06102a; border: 0; padding: 10px 16px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 14px; }
+    button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .meta { display: flex; gap: 14px; font-size: 12px; color: var(--ink-dim); margin-top: 8px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
+    .badge.ok { color: var(--ok); border-color: rgba(34,197,94,0.4); }
+    .badge.err { color: var(--err); border-color: rgba(239,68,68,0.4); }
+    details { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 10px; background: var(--panel); }
+    details summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink-dim); }
+    details[open] summary { color: var(--ink); }
+    pre { background: #0a1130; border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12px; color: #cde3ff; }
+    .step { padding: 10px; border-left: 3px solid var(--border); margin: 8px 0; background: rgba(10,17,48,0.5); border-radius: 0 8px 8px 0; }
+    .step .step-head { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+    .step .step-body { color: var(--ink-dim); font-size: 12px; margin-top: 4px; white-space: pre-wrap; }
+    .answer { font-size: 15px; line-height: 1.6; }
+    .answer h1, .answer h2, .answer h3 { margin: 16px 0 8px; }
+    .answer code { background: #0a1130; padding: 1px 6px; border-radius: 6px; font-size: 13px; }
+    .answer pre code { background: transparent; padding: 0; }
+    .answer table { border-collapse: collapse; margin: 8px 0; }
+    .answer th, .answer td { border: 1px solid var(--border); padding: 6px 10px; font-size: 13px; }
+    .muted { color: var(--ink-dim); font-size: 12px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+    .status-dot.ok { background: var(--ok); }
+    .status-dot.err { background: var(--err); }
+    .empty { color: var(--ink-dim); text-align: center; padding: 36px 10px; font-size: 14px; }
+    footer { color: var(--ink-dim); font-size: 12px; text-align: center; padding: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Banking Agent <span style="color: var(--accent);">·</span> Demo</h1>
+    <p>Planner → Executor → SQL / RAG / Fraud sub-agents. Each sub-agent speaks a typed JSON contract.</p>
+  </header>
+  <main>
+    <section class="card">
+      <div class="row" style="gap: 8px;">
+        <input id="customer" placeholder="customer_id (optional)" style="max-width: 200px;" />
+        <input id="session" placeholder="session_id (optional)" style="max-width: 200px;" />
+      </div>
+      <div class="row" style="margin-top: 10px;">
+        <textarea id="msg" placeholder="Ask something. e.g. How much did I spend last month?" autofocus></textarea>
+      </div>
+      <div class="row" style="margin-top: 10px; justify-content: flex-end;">
+        <button id="send">Send</button>
+      </div>
+    </section>
+
+    <section id="result-card" class="card" hidden>
+      <div class="meta">
+        <span>trace: <code id="trace">-</code></span>
+        <span>latency: <span id="latency">-</span> ms</span>
+        <span id="status-badge" class="badge">pending</span>
+      </div>
+      <details id="plan-details">
+        <summary>Plan (planner output)</summary>
+        <pre id="plan">(none)</pre>
+      </details>
+      <details>
+        <summary>Step results</summary>
+        <div id="steps"></div>
+      </details>
+      <h3 style="margin: 14px 0 6px;">Final answer</h3>
+      <div id="answer" class="answer"></div>
+    </section>
+
+    <section id="empty" class="card empty">
+      Ask a question above. The agent will plan, dispatch to sub-agents, and synthesise the final answer.
+    </section>
+  </main>
+  <footer>
+    <a style="color: var(--accent);" href="/healthz">/healthz</a> · Banking Agent modular monolith
+  </footer>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const btn = $("send");
+    const msg = $("msg");
+
+    btn.addEventListener("click", send);
+    msg.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send();
+    });
+
+    async function send() {
+      const text = msg.value.trim();
+      if (!text) return;
+      btn.disabled = true;
+      btn.textContent = "Running...";
+      $("empty").hidden = true;
+      $("result-card").hidden = false;
+      $("answer").innerHTML = '<span class="muted">Planning and executing... cold start may take 10–15s on the first request.</span>';
+      $("plan").textContent = "(running)";
+      $("steps").innerHTML = "";
+      $("trace").textContent = "-";
+      $("latency").textContent = "-";
+      const badge = $("status-badge");
+      badge.className = "badge"; badge.textContent = "running";
+      try {
+        const r = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            customer_id: $("customer").value || "",
+            session_id: $("session").value || "",
+          }),
+        });
+        const j = await r.json();
+        $("trace").textContent = j.trace_id || "-";
+        $("latency").textContent = j.latency_ms ?? "-";
+        if (j.error) {
+          badge.className = "badge err"; badge.textContent = "error";
+          $("answer").innerHTML = '<pre style="color: var(--err);">' + escapeHtml(j.error) + '</pre>';
+          return;
+        }
+        badge.className = "badge ok"; badge.textContent = "ok";
+        $("plan").textContent = j.plan ? JSON.stringify(j.plan, null, 2) : "(no plan)";
+        renderSteps(j.step_results || {});
+        const md = j.final_answer || "(no final answer)";
+        $("answer").innerHTML = window.marked ? window.marked.parse(md) : escapeHtml(md);
+      } catch (e) {
+        badge.className = "badge err"; badge.textContent = "error";
+        $("answer").innerHTML = '<pre style="color: var(--err);">' + escapeHtml(String(e)) + '</pre>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Send";
+      }
+    }
+
+    function renderSteps(stepResults) {
+      const container = $("steps");
+      container.innerHTML = "";
+      const entries = Object.entries(stepResults || {});
+      if (entries.length === 0) {
+        container.innerHTML = '<p class="muted">(no sub-agent steps executed)</p>';
+        return;
+      }
+      for (const [sid, sr] of entries) {
+        const div = document.createElement("div");
+        div.className = "step";
+        const isOk = (sr && sr.status) === "ok";
+        const summary = (sr && sr.data && sr.data.summary) || (sr && sr.error_message) || "";
+        div.innerHTML =
+          '<div class="step-head"><span class="status-dot ' + (isOk ? "ok" : "err") + '"></span>' +
+          '<strong>' + escapeHtml(sid) + '</strong> · ' +
+          '<span class="muted">' + escapeHtml((sr && sr.owner) || "") + '</span></div>' +
+          '<div class="step-body">' + escapeHtml(summary) + '</div>';
+        container.appendChild(div);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+  </script>
+</body>
+</html>

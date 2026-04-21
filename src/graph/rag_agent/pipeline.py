@@ -1,9 +1,14 @@
 """
 RAG agent: LangChain create_agent with tools (query_rewrite, local_retrieve, web_search).
+
+Public surface:
+    * ``invoke(req: RagAgentRequest) -> RagAgentResponse`` — typed contract.
+    * ``run_rag_agent(...)`` — legacy dict shape, kept for internal use.
 """
 from typing import Any
 
 from src.graph.rag_agent.agent import run_rag_agent_react
+from src.graph.rag_agent.schema import RagAgentRequest, RagAgentResponse
 
 
 def run_rag_agent(
@@ -14,10 +19,7 @@ def run_rag_agent(
     max_local_chunks: int = 5,
     max_web_contexts: int = 3,
 ) -> dict[str, Any]:
-    """
-    Run the RAG agent (LangChain create_agent) and return:
-    answer, citations, route_decision, local_chunks, web_contexts, error.
-    """
+    """Legacy dict-shaped entry point."""
     state = run_rag_agent_react(
         question=question,
         namespace=namespace,
@@ -34,3 +36,30 @@ def run_rag_agent(
         "web_contexts": state.get("web_contexts", []),
         "error": state.get("error"),
     }
+
+
+def invoke(req: RagAgentRequest) -> RagAgentResponse:
+    """Typed entry point."""
+    try:
+        raw = run_rag_agent(
+            question=req.instruction,
+            namespace=req.namespace,
+            filter_dict=req.filter_dict,
+            use_web_fallback=req.use_web_fallback,
+            max_local_chunks=req.max_local_chunks,
+            max_web_contexts=req.max_web_contexts,
+        )
+    except Exception as exc:
+        return RagAgentResponse(status="error", error=str(exc))
+
+    error = raw.get("error")
+    status = "error" if error else "ok"
+    return RagAgentResponse(
+        status=status,
+        summary=(raw.get("answer") or "").strip() if status == "ok" else "",
+        citations=raw.get("citations") or [],
+        route_decision=raw.get("route_decision"),
+        local_chunks=raw.get("local_chunks") or [],
+        web_contexts=raw.get("web_contexts") or [],
+        error=error,
+    )

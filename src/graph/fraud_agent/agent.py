@@ -9,6 +9,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.utils.env import load_env
+from src.utils.langfuse_client import get_langfuse_config
 from src.graph.fraud_agent.tools import make_fraud_tools
 from src.graph.fraud_agent.utils.prompts import agent_system
 from src.models.llm import get_create_agent_model_string
@@ -92,7 +93,7 @@ def run_fraud_agent_react(
     }
     try:
         inputs = {"messages": [HumanMessage(content=question)]}
-        result = graph.invoke(inputs)
+        result = graph.invoke(inputs, config=get_langfuse_config() or None)
         messages = result.get("messages", [])
         analysis = _last_ai_content(messages)
         state["risk_scores"] = collector.get("risk_scores")

@@ -1,0 +1,38 @@
+# VCS / env
+.git
+.gitignore
+.gitattributes
+.env
+.env.*
+
+# Python bytecode / venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+venv
+.venv
+
+# Editor / OS
+.idea
+.vscode
+.DS_Store
+
+# Notebooks + exploratory data (huge, not needed in the runtime image)
+*.ipynb
+.ipynb_checkpoints
+fraud_detection/*.ipynb
+playground
+docs
+
+# Local archives
+*.zip
+*.tar
+*.tgz
+
+# Logs
+*.log
+logs/

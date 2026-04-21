@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from src.utils.env import load_env
 from src.utils.db import get_engine
+from src.utils.langfuse_client import get_langfuse_config
 from src.graph.sql_agent.config import get_table_name
 from src.graph.sql_agent.tools import make_sql_tools
 from src.graph.sql_agent.utils.prompts import agent_system
@@ -64,7 +65,7 @@ def run_sql_agent_react(
 
     try:
         inputs = {"messages": [HumanMessage(content=question)]}
-        result = graph.invoke(inputs)
+        result = graph.invoke(inputs, config=get_langfuse_config() or None)
         messages = result.get("messages", [])
         answer = _last_ai_content(messages)
     except Exception as e:

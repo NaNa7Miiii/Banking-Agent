@@ -10,11 +10,6 @@ from openai import RateLimitError, APIError, APIConnectionError, APITimeoutError
 
 from src.utils.env import load_env, get_env
 
-load_env()
-OPENAI_API_KEY = get_env("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY is not set in environment or .env file")
-
 DEFAULT_MODEL_CONFIG = {
     "frequency_penalty": 0,
     "max_tokens": 4096,
@@ -25,11 +20,20 @@ DEFAULT_MODEL_CONFIG = {
 _client: Optional[OpenAI] = None
 
 
+def _resolve_openai_api_key() -> str:
+    """Lazily load .env and read OPENAI_API_KEY. Raises only when the key is actually needed."""
+    load_env()
+    key = get_env("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY is not set in environment or .env file")
+    return key
+
+
 def get_client() -> OpenAI:
     global _client
     if _client is None:
         _client = OpenAI(
-            api_key=OPENAI_API_KEY,
+            api_key=_resolve_openai_api_key(),
             timeout=100,
             max_retries=3,
         )
@@ -150,9 +154,7 @@ def get_langchain_chat_model(role: LLMRole = "generic"):
     """
     from langchain_openai import ChatOpenAI
     defaults = ROLE_DEFAULTS.get(role, ROLE_DEFAULTS["generic"])
-    api_key = get_env("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set in environment or .env file")
+    api_key = _resolve_openai_api_key()
     return ChatOpenAI(
         model=defaults["model_name"],
         temperature=defaults["temperature"],

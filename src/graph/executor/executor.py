@@ -1,6 +1,14 @@
 """
-Unified executor: execute_step(step, context) -> StepResult.
-Consumes step["instruction"] only; enforces non-empty instruction; routes via router registry (canonical owner).
+Unified executor: ``execute_step(step, context) -> StepResult``.
+
+Consumes ``step["instruction"]`` only; enforces non-empty instruction; routes via the
+router registry (canonical owner).
+
+Each ``_run_<owner>`` handler adapts ``step`` + ``context`` into the sub-agent's
+**Pydantic request schema**, calls the sub-agent's typed ``invoke`` entry point, and
+adapts the **Pydantic response schema** back into ``StepResult``. This is the
+architectural seam we can split into independent services later with zero business-
+logic churn — the sub-agents already speak JSON contracts.
 """
 import time
 from typing import Any
@@ -22,7 +30,7 @@ def _build_result(
     error_message: str = "",
     agent_name: str | None = None,
 ) -> StepResult:
-    """Single place to build StepResult. step must have id and owner (use normalized step from execute_step)."""
+    """Single place to build StepResult."""
     step_id = step.get("id", "")
     owner = step.get("owner", "")
     return {
@@ -43,7 +51,8 @@ def _build_result(
 
 
 def _run_sql(step: dict[str, Any], context: ExecutionContext) -> StepResult:
-    from src.graph.sql_agent.pipeline import run_sql_agent
+    from src.graph.sql_agent.pipeline import invoke as invoke_sql
+    from src.graph.sql_agent.schema import SqlAgentRequest, SqlAgentResponse
     from src.graph.sql_agent.utils.transaction_template import (
         _instruction_looks_like_transaction_retrieval,
         _parse_date_range,
@@ -55,6 +64,7 @@ def _run_sql(step: dict[str, Any], context: ExecutionContext) -> StepResult:
     instruction = _instruction_from_step(step)
     user_id = context.get("current_user_id") or ""
 
+    # Fast path: transaction retrieval template bypasses the LLM entirely.
     if user_id and _instruction_looks_like_transaction_retrieval(instruction):
         start_end = _parse_date_range(instruction)
         if start_end:
@@ -65,100 +75,123 @@ def _run_sql(step: dict[str, Any], context: ExecutionContext) -> StepResult:
                 engine, table_name, user_id, start_date, end_date
             )
             if err:
-                return _build_result(
-                    step, "error", "",
-                    artifacts={"sql": None, "result": None},
-                    error_message=err,
-                    agent_name="sql_agent",
+                resp = SqlAgentResponse(status="error", error=err)
+            else:
+                summary = f"Retrieved {len(rows or [])} transaction(s)."
+                if truncated:
+                    summary += " (Capped at 1000 rows.)"
+                resp = SqlAgentResponse(
+                    status="ok",
+                    summary=summary,
+                    sql="(transaction retrieval template)",
+                    result=rows,
+                    row_count=len(rows or []),
+                    truncated=truncated,
                 )
-            summary = f"Retrieved {len(rows)} transaction(s)."
-            if truncated:
-                summary += " (Capped at 1000 rows.)"
-            return _build_result(
-                step, "ok", summary,
-                artifacts={"sql": "(transaction retrieval template)", "result": rows},
-                error_message="",
-                agent_name="sql_agent",
-            )
+            return _sql_response_to_step_result(step, resp)
 
-    out = run_sql_agent(question=instruction, current_user_id=user_id)
-    status = "ok" if not out.get("error") else "error"
-    summary = (out.get("answer") or "").strip() if status == "ok" else ""
+    req = SqlAgentRequest(
+        instruction=instruction,
+        current_user_id=user_id,
+    )
+    resp = invoke_sql(req)
+    return _sql_response_to_step_result(step, resp)
+
+
+def _sql_response_to_step_result(step: dict[str, Any], resp: Any) -> StepResult:
     return _build_result(
-        step, status, summary,
-        artifacts={"sql": out.get("sql"), "result": out.get("result")},
-        error_message=(out.get("error") or "") if status == "error" else "",
+        step,
+        status=resp.status,
+        summary=resp.summary,
+        artifacts={"sql": resp.sql, "result": resp.result},
+        error_message=resp.error or "",
         agent_name="sql_agent",
     )
 
 
 def _run_rag(step: dict[str, Any], context: ExecutionContext) -> StepResult:
-    from src.graph.rag_agent.pipeline import run_rag_agent
-    instruction = _instruction_from_step(step)
-    ns = context.get("namespace")
-    out = run_rag_agent(question=instruction, namespace=ns)
-    status = "ok" if not out.get("error") else "error"
-    summary = (out.get("answer") or "").strip() if status == "ok" else ""
+    from src.graph.rag_agent.pipeline import invoke as invoke_rag
+    from src.graph.rag_agent.schema import RagAgentRequest
+
+    req = RagAgentRequest(
+        instruction=_instruction_from_step(step),
+        namespace=context.get("namespace"),
+    )
+    resp = invoke_rag(req)
     return _build_result(
-        step, status, summary,
+        step,
+        status=resp.status,
+        summary=resp.summary,
         artifacts={
-            "citations": out.get("citations", []),
-            "route_decision": out.get("route_decision"),
+            "citations": resp.citations,
+            "route_decision": resp.route_decision,
         },
-        error_message=(out.get("error") or "") if status == "error" else "",
+        error_message=resp.error or "",
         agent_name="rag_agent",
     )
 
 
-def _run_fraud(step: dict[str, Any], context: ExecutionContext) -> StepResult:
-    import logging
-    logger = logging.getLogger(__name__)
-    from src.graph.fraud_agent.pipeline import run_fraud_agent
-    instruction = _instruction_from_step(step)
-    user_id = context.get("current_user_id") or ""
-    prev_results = context.get("previous_step_results") or {}
-    logger.info(
-        "fraud_executor: step_id=%s prev_results_keys=%s depends_on=%s",
-        step.get("id"),
-        list(prev_results.keys()),
-        [d.get("step_id") if isinstance(d, dict) else d for d in (step.get("depends_on") or [])],
-    )
-    initial_sql_result = None
-    initial_sql_answer = None
+def _extract_dep_step_id(dep: Any) -> str:
+    if isinstance(dep, str):
+        return (dep or "").strip()
+    if isinstance(dep, dict):
+        return (dep.get("step_id") or dep.get("step") or "").strip()
+    return ""
 
-    def _extract_dep_id(dep: Any) -> str:
-        if isinstance(dep, str):
-            return (dep or "").strip()
-        if isinstance(dep, dict):
-            return (dep.get("step_id") or dep.get("step") or "").strip()
-        return ""
 
-    for dep in (step.get("depends_on") or []):
-        dep_id = _extract_dep_id(dep)
+def _pick_upstream_sql_rows(
+    step: dict[str, Any],
+    prev_results: dict[str, Any],
+) -> tuple[list[dict[str, Any]] | None, str | None]:
+    """Find the most relevant upstream SQL rows for a fraud step.
+
+    Preference order:
+      1) explicit ``depends_on`` (whichever completed ok and has ``artifacts.result`` list)
+      2) fallback: any prior ok step with an ``artifacts.result`` list
+    """
+    for dep in step.get("depends_on") or []:
+        dep_id = _extract_dep_step_id(dep)
         if not dep_id:
             continue
         sr = prev_results.get(dep_id) or {}
         if sr.get("status") != "ok":
             continue
-        data = sr.get("data") or {}
-        artifacts = data.get("artifacts") or {}
-        res = artifacts.get("result")
-        if res is not None and isinstance(res, list):
-            initial_sql_result = res
-            initial_sql_answer = (data.get("summary") or "").strip()
-            break
+        artifacts = (sr.get("data") or {}).get("artifacts") or {}
+        rows = artifacts.get("result")
+        if isinstance(rows, list):
+            return rows, ((sr.get("data") or {}).get("summary") or "").strip()
 
-    # Fallback: if no result from depends_on (e.g. wrong step_id format), use first prev step with artifacts.result
-    if initial_sql_result is None and prev_results:
-        for sid, sr in prev_results.items():
-            if (sr or {}).get("status") != "ok":
-                continue
-            data = (sr or {}).get("data") or {}
-            artifacts = data.get("artifacts") or {}
-            if "result" in artifacts and artifacts["result"] is not None and isinstance(artifacts["result"], list):
-                initial_sql_result = artifacts["result"]
-                initial_sql_answer = (data.get("summary") or "").strip()
-                break
+    for _sid, sr in prev_results.items():
+        if (sr or {}).get("status") != "ok":
+            continue
+        artifacts = ((sr or {}).get("data") or {}).get("artifacts") or {}
+        rows = artifacts.get("result")
+        if isinstance(rows, list):
+            return rows, (((sr or {}).get("data") or {}).get("summary") or "").strip()
+
+    return None, None
+
+
+def _run_fraud(step: dict[str, Any], context: ExecutionContext) -> StepResult:
+    import logging
+
+    from src.graph.fraud_agent.pipeline import invoke as invoke_fraud
+    from src.graph.fraud_agent.schema import FraudAgentRequest
+
+    logger = logging.getLogger(__name__)
+
+    instruction = _instruction_from_step(step)
+    user_id = context.get("current_user_id") or ""
+    prev_results = context.get("previous_step_results") or {}
+
+    logger.info(
+        "fraud_executor: step_id=%s prev_results_keys=%s depends_on=%s",
+        step.get("id"),
+        list(prev_results.keys()),
+        [_extract_dep_step_id(d) for d in (step.get("depends_on") or [])],
+    )
+
+    initial_sql_result, initial_sql_answer = _pick_upstream_sql_rows(step, prev_results)
 
     logger.info(
         "fraud_executor: step_id=%s initial_sql_result_set=%s initial_len=%s",
@@ -167,26 +200,35 @@ def _run_fraud(step: dict[str, Any], context: ExecutionContext) -> StepResult:
         len(initial_sql_result) if initial_sql_result is not None else 0,
     )
 
-    question = instruction
+    instruction_for_agent = instruction
     if initial_sql_result is not None:
-        question = f"{instruction}\n\n(Transaction data from the previous step is already loaded; call analyze_risk_scores_batch with input 'use last result' to score it.)"
-    out = run_fraud_agent(
-        question=question,
+        instruction_for_agent = (
+            f"{instruction}\n\n"
+            "(Transaction data from the previous step is already loaded; "
+            "call analyze_risk_scores_batch with input 'use last result' to score it.)"
+        )
+
+    req = FraudAgentRequest(
+        instruction=instruction_for_agent,
         current_user_id=user_id,
         initial_sql_result=initial_sql_result,
         initial_sql_answer=initial_sql_answer,
     )
-    status = "ok" if not out.get("error") else "error"
-    summary = (out.get("analysis") or "").strip() if status == "ok" else ""
+    resp = invoke_fraud(req)
     return _build_result(
-        step, status, summary,
-        artifacts={"risk_scores": out.get("risk_scores"), "profile": out.get("profile")},
-        error_message=(out.get("error") or "") if status == "error" else "",
+        step,
+        status=resp.status,
+        summary=resp.summary,
+        artifacts={
+            "risk_scores": resp.risk_scores,
+            "profile": resp.profile,
+        },
+        error_message=resp.error or "",
         agent_name="fraud_agent",
     )
 
 
-# Register only canonical owners so trace/aggregation see one format.
+# Register only canonical owners so trace / aggregation see one format.
 register("subagent:sql", _run_sql)
 register("subagent:rag", _run_rag)
 register("subagent:fraud", _run_fraud)
@@ -200,15 +242,11 @@ _HANDLER_AGENT_NAME: dict[Any, str] = {
 
 
 def execute_step(step: dict[str, Any], context: ExecutionContext) -> StepResult:
-    """
-    Execute one plan step. Requires non-empty step["instruction"]; canonicalizes owner; routes via ROUTER.
-    Writes normalized id/owner back into a step copy so handlers see canonical owner and consistent step_id.
-    """
+    """Execute one plan step. Normalizes owner → canonical → dispatches via ROUTER."""
     step_id = step.get("id") or ""
     owner_raw = (step.get("owner") or "").strip()
     owner_canonical = get_canonical(owner_raw)
 
-    # Single normalized step: handlers and all _build_result calls use this (canonical owner, stable id).
     step_normalized = dict(step)
     step_normalized["id"] = step_id
     step_normalized["owner"] = owner_canonical or owner_raw

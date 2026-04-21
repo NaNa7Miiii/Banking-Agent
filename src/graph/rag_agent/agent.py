@@ -7,6 +7,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.utils.env import load_env
+from src.utils.langfuse_client import get_langfuse_config
 from src.graph.rag_agent.state import RAGAgentState, initial_rag_state
 from src.graph.rag_agent.config import get_default_namespace
 from src.graph.rag_agent.tools import make_rag_tools
@@ -79,7 +80,7 @@ def run_rag_agent_react(
 
     try:
         inputs = {"messages": [HumanMessage(content=question)]}
-        result = graph.invoke(inputs)
+        result = graph.invoke(inputs, config=get_langfuse_config() or None)
         messages = result.get("messages", [])
         answer = _last_ai_content(messages)
     except Exception as e:

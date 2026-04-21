@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.engine import Engine
 
 from src.utils.db import run_read_only
+from src.utils.json_safe import rows_to_json_safe
 from src.graph.sql_agent.config import USER_COLUMN, get_max_sql_rows
 
 # Columns required for fraud batch scoring (feature build + display)
@@ -111,4 +112,4 @@ def run_transaction_retrieval_template(
     max_rows = get_max_sql_rows()
     out = rows[:max_rows] if len(rows) > max_rows else rows
     truncated = len(rows) > max_rows
-    return out, None, truncated
+    return rows_to_json_safe(out), None, truncated
