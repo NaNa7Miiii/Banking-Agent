@@ -20,14 +20,16 @@ ENV/
 *.swo
 .DS_Store
 
-# Jupyter
+# Jupyter — all notebooks are dev-only, never ship to deploy
 .ipynb_checkpoints/
 *.ipynb_checkpoints
+*.ipynb
 
 # Local / excluded from reorg (do not re-add)
 CIBC_docs/
 docs/
 notebooks/
+src/scripts/debug_fraud_injection.py
 
 # Optional: uncomment if you have large assets
 # resources/data/
