@@ -29,9 +29,10 @@ RUN pip install --upgrade pip \
  && rm -rf /root/.cache /var/lib/apt/lists/*
 
 # Copy only runtime assets (see .dockerignore for the exclude list).
+# resources/ is intentionally omitted: RAG source docs live in Pinecone at runtime;
+# the local resources/ directory is only used offline by scripts/upsert_rag_docs.py.
 COPY src ./src
 COPY fraud_detection/ml_model ./fraud_detection/ml_model
-COPY resources ./resources
 
 # Non-root user for defence-in-depth.
 RUN useradd --create-home --uid 1001 app \
