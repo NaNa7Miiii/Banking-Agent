@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from src.graph.planner.state import PlannerState, Plan
-from src.graph.executor.router import get_canonical
+from src.graph.executor.router import get_canonical, canonical_owners
 from src.models.llm import get_llm
 from src.utils.prompt_loader import load_system_prompt
 from src.graph.planner.utils.schema_validator import load_schema, validate_plan
@@ -52,6 +52,52 @@ def _normalize_join_points(join_points: list[dict[str, Any]]) -> None:
             jp["after_parallel_group"] = "group_" + str(i) if step_ids else ""
 
 
+def _prune_illegal_owner_steps(plan: dict[str, Any]) -> None:
+    """
+    Drop steps whose (canonicalized) owner is not supported by the executor.
+    Also scrub dangling references so remaining steps stay runnable:
+      - `depends_on` entries pointing at dropped steps are removed
+      - `next_step_id` pointing at a dropped step falls back to the first kept step
+      - `join_points.merge_artifacts_from_steps` drops dropped ids
+
+    The planner occasionally invents owners like `main`, `banking_assistant`, or
+    `tool:<x>` for summarization/aggregation steps. Aggregation is the
+    aggregator node's job, not a plan step, so those entries are safely pruned.
+    """
+    legal = canonical_owners()
+    steps = plan.get("steps") or []
+    kept: list[dict[str, Any]] = []
+    dropped_ids: set[str] = set()
+    for step in steps:
+        if step.get("owner") in legal:
+            kept.append(step)
+        else:
+            sid = step.get("id") or ""
+            if sid:
+                dropped_ids.add(sid)
+            logger.warning(
+                "Planner emitted step %s with unsupported owner %r; dropping. Legal owners: %s",
+                step.get("id"),
+                step.get("owner"),
+                sorted(legal),
+            )
+    if not dropped_ids:
+        return
+    for step in kept:
+        step["depends_on"] = [
+            d for d in (step.get("depends_on") or [])
+            if (d.get("step_id") or "") not in dropped_ids
+        ]
+    if (plan.get("next_step_id") or "") in dropped_ids:
+        plan["next_step_id"] = kept[0]["id"] if kept else None
+    for jp in plan.get("join_points") or []:
+        jp["merge_artifacts_from_steps"] = [
+            sid for sid in (jp.get("merge_artifacts_from_steps") or [])
+            if sid not in dropped_ids
+        ]
+    plan["steps"] = kept
+
+
 def _normalize_plan(plan: dict[str, Any]) -> Plan:
     """Ensure required/default fields for steps and join_points; keep schema-compliant."""
     steps = plan.get("steps") or []
@@ -71,6 +117,9 @@ def _normalize_plan(plan: dict[str, Any]) -> Plan:
         # Canonical owner so executor and trace use one format (subagent:sql, subagent:rag, subagent:fraud)
         step["owner"] = get_canonical(step.get("owner") or "")
     plan["steps"] = steps
+    # Defense-in-depth: even if the prompt or schema is misaligned, never let an
+    # unsupported owner reach the executor.
+    _prune_illegal_owner_steps(plan)
     join_points = plan.get("join_points") or []
     _normalize_join_points(join_points)
     plan["join_points"] = join_points

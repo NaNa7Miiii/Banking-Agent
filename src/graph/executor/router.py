@@ -21,6 +21,15 @@ def get_canonical(owner: str) -> str:
     return OWNER_ALIASES.get(key, (owner or "").strip())
 
 
+def canonical_owners() -> set[str]:
+    """
+    Static set of canonical owners the planner is allowed to emit.
+    Independent of ROUTER registration order so callers (e.g. planner) can
+    validate before handlers are imported.
+    """
+    return set(OWNER_ALIASES.values())
+
+
 def register(owner: str, handler: Callable[[Any, Any], Any]) -> None:
     """Register a handler for a canonical owner. Idempotent: repeated register for same owner overwrites; safe if module is re-imported."""
     ROUTER[owner] = handler

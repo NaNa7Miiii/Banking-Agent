@@ -43,7 +43,7 @@
 
           "owner": {
             "type": "string",
-            "pattern": "^(main|react_executor|subagent:[a-z0-9_\\-]+|tool:[a-z0-9_\\-]+)$"
+            "enum": ["subagent:sql", "subagent:rag", "subagent:fraud"]
           },
 
           "depends_on": {
