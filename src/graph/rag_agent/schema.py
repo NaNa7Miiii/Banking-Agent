@@ -26,8 +26,14 @@ class RagAgentResponse(BaseModel):
 
     status: Literal["ok", "error"]
     summary: str = ""
-    citations: list[dict[str, Any]] = Field(default_factory=list)
+    # Items are JSON-compatible but not all tools return the same shape:
+    #   - local_chunks: usually {text, score, metadata} dicts from Pinecone
+    #   - web_contexts: Tavily tool returns plain strings like "Source: ... \n ..."
+    #   - citations: a list of URL/title dicts, but some paths emit plain strings
+    # We keep the contract lenient (Any) at the field level and document the
+    # expected shape here so downstream consumers can branch on type.
+    citations: list[Any] = Field(default_factory=list)
     route_decision: str | None = None
-    local_chunks: list[dict[str, Any]] = Field(default_factory=list)
-    web_contexts: list[dict[str, Any]] = Field(default_factory=list)
+    local_chunks: list[Any] = Field(default_factory=list)
+    web_contexts: list[Any] = Field(default_factory=list)
     error: str | None = None
