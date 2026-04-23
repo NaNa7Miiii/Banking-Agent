@@ -4,35 +4,42 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Banking Agent</title>
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2318191c'/><path d='M20 18h18a8 8 0 010 16H20zm0 14h20a8 8 0 010 16H20z' fill='none' stroke='%23e7e8ea' stroke-width='3.5' stroke-linejoin='round'/></svg>" />
+  <link rel="icon" href="/agent-avatar.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
   <style>
     :root {
-      --bg: #0a0a0b;
-      --surface: #111113;
-      --surface-2: #161619;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --ink: #ededef;
-      --ink-dim: #9a9aa2;
-      --ink-faint: #5a5a63;
-      --accent: #7aa2ff;
-      --ok: #4ade80;
-      --err: #f87171;
-      --warn: #fbbf24;
+      /* Warm ivory / sand palette — designed around a portrait with cool blue eyes
+         so the accents stay in the warm family and let the avatar pop. */
+      --bg: #f6efe1;
+      --bg-soft: #f1e8d4;
+      --surface: #fdf8ec;
+      --surface-2: #f1e6cf;
+      --border: rgba(60, 40, 20, 0.10);
+      --border-strong: rgba(60, 40, 20, 0.18);
+      --ink: #2a2218;
+      --ink-dim: #6d5d48;
+      --ink-faint: #a8987f;
+      --accent: #b57235;         /* warm terracotta */
+      --accent-soft: #e3b888;
+      --user-bubble: #ebd9b5;    /* slightly deeper than bg for subtle contrast */
+      --ok: #4b8a4b;
+      --err: #b94a3a;
       --radius: 12px;
       --radius-lg: 16px;
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+      --shadow-sm: 0 1px 2px rgba(70, 50, 20, 0.06);
+      --shadow-md: 0 10px 30px rgba(80, 55, 20, 0.12);
     }
 
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; height: 100%; }
     body {
-      background: var(--bg);
+      background:
+        radial-gradient(900px 450px at 15% -10%, rgba(227, 184, 136, 0.35), transparent 60%),
+        radial-gradient(700px 400px at 110% 10%, rgba(181, 114, 53, 0.18), transparent 60%),
+        var(--bg);
       color: var(--ink);
       font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-size: 15px;
@@ -49,19 +56,19 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 24px;
       border-bottom: 1px solid var(--border);
-      background: rgba(10, 10, 11, 0.7);
-      backdrop-filter: saturate(140%) blur(12px);
+      background: rgba(253, 248, 236, 0.78);
+      backdrop-filter: saturate(160%) blur(14px);
       z-index: 10;
     }
     .brand { display: flex; align-items: center; gap: 10px; }
     .logo {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: linear-gradient(135deg, #2a2a2f, #18191c);
+      width: 30px; height: 30px; border-radius: 999px;
+      overflow: hidden;
       border: 1px solid var(--border-strong);
-      display: grid; place-items: center;
-      font-weight: 700; font-size: 14px; color: var(--ink);
-      letter-spacing: -0.02em;
+      background: var(--surface);
+      flex-shrink: 0;
     }
+    .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .brand-name { font-weight: 600; letter-spacing: -0.01em; }
 
     .topbar-actions { display: flex; align-items: center; gap: 10px; }
@@ -89,19 +96,27 @@
     .status-pill .dot {
       width: 6px; height: 6px; border-radius: 999px;
       background: var(--ok);
-      box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+      box-shadow: 0 0 8px rgba(75, 138, 75, 0.45);
     }
 
     /* ── Conversation area ───────────────────────────────────────── */
     .stage { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
     .stage::-webkit-scrollbar { width: 10px; }
-    .stage::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 10px; }
-    .stage::-webkit-scrollbar-thumb:hover { background: #24252a; }
+    .stage::-webkit-scrollbar-track { background: transparent; }
+    .stage::-webkit-scrollbar-thumb { background: rgba(60, 40, 20, 0.12); border-radius: 10px; }
+    .stage::-webkit-scrollbar-thumb:hover { background: rgba(60, 40, 20, 0.22); }
 
     .stream { max-width: 760px; margin: 0 auto; padding: 24px 24px 140px; }
 
     /* Empty / splash state */
-    .splash { text-align: center; padding: 80px 20px 40px; }
+    .splash { text-align: center; padding: 64px 20px 40px; }
+    .splash-avatar {
+      width: 68px; height: 68px; border-radius: 999px;
+      overflow: hidden; margin: 0 auto 18px;
+      border: 2px solid var(--surface);
+      box-shadow: var(--shadow-md);
+    }
+    .splash-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .splash h1 {
       font-size: 30px; font-weight: 600; letter-spacing: -0.02em;
       margin: 0 0 10px; color: var(--ink);
@@ -116,16 +131,18 @@
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); color: var(--ink-dim);
       font-size: 13.5px; line-height: 1.45;
-      transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
+      font-family: inherit;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease, box-shadow 160ms ease;
     }
     .suggest:hover {
-      background: var(--surface-2); border-color: var(--border-strong);
+      background: #fffdf6; border-color: var(--accent-soft);
       color: var(--ink); transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
     }
     .suggest .tag {
-      display: inline-block; font-size: 10.5px; letter-spacing: 0.06em;
-      text-transform: uppercase; color: var(--ink-faint); margin-bottom: 4px;
-      font-weight: 500;
+      display: inline-block; font-size: 10.5px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 4px;
+      font-weight: 600;
     }
 
     /* Turns */
@@ -133,14 +150,28 @@
     .turn-user { display: flex; justify-content: flex-end; }
     .bubble-user {
       max-width: 78%;
-      background: var(--surface-2);
+      background: var(--user-bubble);
       border: 1px solid var(--border);
       padding: 10px 14px;
       border-radius: 14px 14px 4px 14px;
       font-size: 14.5px;
       white-space: pre-wrap;
       color: var(--ink);
+      box-shadow: var(--shadow-sm);
     }
+
+    /* Agent turn: [avatar] [content column] */
+    .turn-agent { display: flex; gap: 12px; align-items: flex-start; }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 999px;
+      overflow: hidden; flex-shrink: 0;
+      border: 1.5px solid var(--surface);
+      box-shadow: var(--shadow-sm);
+      background: var(--surface);
+      margin-top: 2px;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .agent-col { flex: 1; min-width: 0; }
 
     .turn-agent .answer { color: var(--ink); font-size: 15px; line-height: 1.65; }
     .turn-agent .answer p { margin: 0 0 12px; }
@@ -156,24 +187,29 @@
     .turn-agent .answer code {
       font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
       font-size: 12.5px;
-      background: var(--surface-2);
+      background: var(--bg-soft);
       padding: 1.5px 6px; border-radius: 5px;
       border: 1px solid var(--border);
+      color: #5a3e1f;
     }
     .turn-agent .answer pre {
       background: var(--surface); border: 1px solid var(--border);
       padding: 12px; border-radius: var(--radius); overflow-x: auto;
       font-size: 12.5px;
     }
-    .turn-agent .answer pre code { background: transparent; border: 0; padding: 0; }
+    .turn-agent .answer pre code { background: transparent; border: 0; padding: 0; color: inherit; }
     .turn-agent .answer table { border-collapse: collapse; margin: 8px 0 16px; width: 100%; }
     .turn-agent .answer th, .turn-agent .answer td {
       border: 1px solid var(--border); padding: 8px 12px;
       font-size: 13px; text-align: left;
     }
-    .turn-agent .answer th { background: var(--surface-2); font-weight: 600; }
+    .turn-agent .answer th { background: var(--bg-soft); font-weight: 600; }
     .turn-agent .answer a { color: var(--accent); text-decoration: none; }
     .turn-agent .answer a:hover { text-decoration: underline; }
+    .turn-agent .answer blockquote {
+      margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--accent-soft);
+      color: var(--ink-dim); background: rgba(227, 184, 136, 0.12);
+    }
 
     .agent-meta {
       display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -214,7 +250,7 @@
     .step {
       display: flex; gap: 10px; align-items: flex-start;
       padding: 10px 12px; margin: 6px 0;
-      background: var(--surface-2);
+      background: var(--bg-soft);
       border: 1px solid var(--border);
       border-radius: 10px;
     }
@@ -222,8 +258,8 @@
       width: 7px; height: 7px; border-radius: 999px;
       margin-top: 8px; flex-shrink: 0;
     }
-    .step .dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(74, 222, 128, 0.4); }
-    .step .dot.err { background: var(--err); box-shadow: 0 0 6px rgba(248, 113, 113, 0.4); }
+    .step .dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(75, 138, 75, 0.35); }
+    .step .dot.err { background: var(--err); box-shadow: 0 0 6px rgba(185, 74, 58, 0.35); }
     .step-head {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       font-size: 12.5px;
@@ -234,8 +270,8 @@
       font-size: 11px;
       padding: 1px 7px; border-radius: 5px;
       border: 1px solid var(--border);
-      color: var(--ink-dim);
-      background: var(--bg);
+      color: var(--accent);
+      background: var(--surface);
     }
     .step-body {
       margin-top: 5px; font-size: 12.5px; color: var(--ink-dim);
@@ -246,7 +282,7 @@
       margin-top: 10px;
       font-family: "JetBrains Mono", monospace;
       font-size: 11.5px;
-      background: var(--bg);
+      background: var(--bg-soft);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px;
@@ -283,7 +319,7 @@
     .composer-wrap {
       position: absolute; left: 0; right: 0; bottom: 0;
       padding: 16px 24px 24px;
-      background: linear-gradient(to top, var(--bg) 60%, rgba(10, 10, 11, 0) 100%);
+      background: linear-gradient(to top, var(--bg) 55%, rgba(246, 239, 225, 0) 100%);
       pointer-events: none;
     }
     .composer {
@@ -295,11 +331,11 @@
       box-shadow: var(--shadow-md);
       padding: 10px 10px 10px 14px;
       display: flex; align-items: flex-end; gap: 8px;
-      transition: border-color 120ms ease;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
     }
     .composer:focus-within {
-      border-color: rgba(122, 162, 255, 0.5);
-      box-shadow: var(--shadow-md), 0 0 0 3px rgba(122, 162, 255, 0.12);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md), 0 0 0 3px rgba(181, 114, 53, 0.15);
     }
     .composer textarea {
       flex: 1;
@@ -315,12 +351,12 @@
     .send-btn {
       flex-shrink: 0;
       width: 36px; height: 36px; border-radius: 10px;
-      background: var(--ink); color: var(--bg);
+      background: var(--accent); color: #fffdf6;
       border: 0; cursor: pointer;
       display: grid; place-items: center;
       transition: background 120ms ease, transform 80ms ease;
     }
-    .send-btn:hover:not(:disabled) { background: #fff; }
+    .send-btn:hover:not(:disabled) { background: #9d5f26; }
     .send-btn:active:not(:disabled) { transform: scale(0.96); }
     .send-btn:disabled {
       background: var(--surface-2); color: var(--ink-faint);
@@ -342,9 +378,9 @@
 
     /* Error bubble */
     .err-box {
-      border: 1px solid rgba(248, 113, 113, 0.3);
-      background: rgba(248, 113, 113, 0.06);
-      color: #fecaca;
+      border: 1px solid rgba(185, 74, 58, 0.28);
+      background: rgba(185, 74, 58, 0.08);
+      color: #7d3a2e;
       padding: 10px 14px; border-radius: var(--radius);
       font-size: 13px;
       font-family: "JetBrains Mono", monospace;
@@ -365,7 +401,7 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="logo">B</div>
+        <div class="logo"><img src="/agent-avatar.jpg" alt="" /></div>
         <div class="brand-name">Banking Agent</div>
       </div>
       <div class="topbar-actions">
@@ -382,6 +418,7 @@
     <div class="stage" id="stage">
       <div class="stream" id="stream">
         <div class="splash" id="splash">
+          <div class="splash-avatar"><img src="/agent-avatar.jpg" alt="" /></div>
           <h1>What can I help you with?</h1>
           <p>Ask about your transactions, CIBC products, or check for suspicious activity. Answers cite the sources and show the steps taken.</p>
           <div class="suggest-grid">
@@ -518,10 +555,15 @@
       scrollToBottom();
     }
 
+    const AVATAR_HTML = '<div class="avatar"><img src="/agent-avatar.jpg" alt="" /></div>';
+
     function renderAgentThinking() {
       const div = document.createElement("div");
       div.className = "turn turn-agent";
-      div.innerHTML = '<div class="thinking"><span class="shimmer">Thinking…</span></div>';
+      div.innerHTML = AVATAR_HTML +
+        '<div class="agent-col">' +
+          '<div class="thinking"><span class="shimmer">Thinking…</span></div>' +
+        '</div>';
       stream.appendChild(div);
       scrollToBottom();
       return div;
@@ -537,24 +579,26 @@
       const stepsHtml = buildStepsHtml(j.step_results || {});
       const hasReasoning = stepCount > 0 || !!j.plan;
 
-      turnEl.innerHTML =
-        '<div class="answer">' + answerHtml + '</div>' +
-        (hasReasoning ? (
-          '<details class="reasoning">' +
-            '<summary>Reasoning · ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') + ' · ' + secs + 's</summary>' +
-            '<div class="reasoning-body">' +
-              stepsHtml +
-              (planText ? (
-                '<span class="raw-toggle" data-toggle="plan">Show plan (JSON)</span>' +
-                '<pre class="plan-json" hidden>' + escapeHtml(planText) + '</pre>'
-              ) : '') +
-            '</div>' +
-          '</details>'
-        ) : '') +
-        '<div class="agent-meta">' +
-          '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
-          '<span class="sep">·</span>' +
-          '<span>' + secs + 's</span>' +
+      turnEl.innerHTML = AVATAR_HTML +
+        '<div class="agent-col">' +
+          '<div class="answer">' + answerHtml + '</div>' +
+          (hasReasoning ? (
+            '<details class="reasoning">' +
+              '<summary>Reasoning · ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') + ' · ' + secs + 's</summary>' +
+              '<div class="reasoning-body">' +
+                stepsHtml +
+                (planText ? (
+                  '<span class="raw-toggle" data-toggle="plan">Show plan (JSON)</span>' +
+                  '<pre class="plan-json" hidden>' + escapeHtml(planText) + '</pre>'
+                ) : '') +
+              '</div>' +
+            '</details>'
+          ) : '') +
+          '<div class="agent-meta">' +
+            '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
+            '<span class="sep">·</span>' +
+            '<span>' + secs + 's</span>' +
+          '</div>' +
         '</div>';
 
       turnEl.querySelectorAll(".raw-toggle").forEach((el) => {
@@ -593,11 +637,13 @@
     }
 
     function renderAgentError(turnEl, j) {
-      turnEl.innerHTML =
-        '<div class="err-box">' + escapeHtml(j.error || "Something went wrong.") + '</div>' +
-        '<div class="agent-meta">' +
-          '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
-          (j.latency_ms ? '<span class="sep">·</span><span>' + (j.latency_ms / 1000).toFixed(1) + 's</span>' : '') +
+      turnEl.innerHTML = AVATAR_HTML +
+        '<div class="agent-col">' +
+          '<div class="err-box">' + escapeHtml(j.error || "Something went wrong.") + '</div>' +
+          '<div class="agent-meta">' +
+            '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
+            (j.latency_ms ? '<span class="sep">·</span><span>' + (j.latency_ms / 1000).toFixed(1) + 's</span>' : '') +
+          '</div>' +
         '</div>';
       scrollToBottom();
     }
