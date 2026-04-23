@@ -27,6 +27,26 @@ def run_fraud_agent(
     )
 
 
+def _normalize_risk_scores(raw_scores: Any) -> Optional[List[dict[str, Any]]]:
+    """
+    Internally, ``run_batch_risk_scores`` returns
+    ``{"results": [...per-transaction score dicts...], "summary": "..."}``.
+    The schema (and every downstream consumer) wants a plain list of
+    score dicts, so unwrap the wrapper here. Legacy shapes (already a
+    list, or None) are preserved. Anything unexpected becomes None.
+    """
+    raw_scores = to_json_safe(raw_scores)
+    if raw_scores is None:
+        return None
+    if isinstance(raw_scores, list):
+        return raw_scores
+    if isinstance(raw_scores, dict):
+        results = raw_scores.get("results")
+        if isinstance(results, list):
+            return results
+    return None
+
+
 def invoke(req: FraudAgentRequest) -> FraudAgentResponse:
     """Typed entry point."""
     try:
@@ -44,7 +64,7 @@ def invoke(req: FraudAgentRequest) -> FraudAgentResponse:
     return FraudAgentResponse(
         status=status,
         summary=(raw.get("analysis") or "").strip() if status == "ok" else "",
-        risk_scores=to_json_safe(raw.get("risk_scores")),
+        risk_scores=_normalize_risk_scores(raw.get("risk_scores")),
         profile=to_json_safe(raw.get("profile")),
         error=error,
     )
