@@ -99,6 +99,62 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/healthz/redis")
+def healthz_redis() -> dict[str, Any]:
+    """
+    Readiness probe specifically for conversation memory. Returns one of:
+      - ``{"status": "ok",       "host", "port", "latency_ms", "message_keys", "summary_keys"}``
+          Redis is reachable and we can count existing memory keys.
+      - ``{"status": "unconfigured", "reason": "REDIS_HOST/REDIS_PORT not set"}``
+          No env vars → chat runs, but without conversation memory.
+      - ``{"status": "error",    "host", "port", "reason": ...}``
+          Env vars are set but the ping / auth failed.
+    """
+    host = os.environ.get("REDIS_HOST") or ""
+    port = os.environ.get("REDIS_PORT") or ""
+    if not host or not port:
+        return {
+            "status": "unconfigured",
+            "reason": "REDIS_HOST or REDIS_PORT is not set; chat runs without memory.",
+        }
+
+    t0 = time.perf_counter()
+    try:
+        import redis  # lazy import; redis-py is already a requirement
+        client = redis.Redis(
+            host=host,
+            port=int(port),
+            db=0,
+            password=os.environ.get("REDIS_PASSWORD") or None,
+            decode_responses=True,
+            socket_connect_timeout=3,
+            socket_timeout=3,
+        )
+        pong = client.ping()
+        if not pong:
+            raise RuntimeError("PING returned false")
+        # Count existing memory keys so the user can confirm the *correct* Redis
+        # instance is being used (not some other random one).
+        message_keys = len(list(client.scan_iter(match="message_store:*", count=500)))
+        summary_keys = len(list(client.scan_iter(match="conversation_summary:*", count=500)))
+        return {
+            "status": "ok",
+            "host": host,
+            "port": port,
+            "latency_ms": int((time.perf_counter() - t0) * 1000),
+            "message_keys": message_keys,
+            "summary_keys": summary_keys,
+        }
+    except Exception as exc:
+        logger.warning("healthz_redis: connect failed: %s", exc)
+        return {
+            "status": "error",
+            "host": host,
+            "port": port,
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
     trace_id = uuid.uuid4().hex[:12]
