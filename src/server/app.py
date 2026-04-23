@@ -110,12 +110,14 @@ def healthz_redis() -> dict[str, Any]:
       - ``{"status": "error",    "host", "port", "reason": ...}``
           Env vars are set but the ping / auth failed.
     """
-    host = os.environ.get("REDIS_HOST") or ""
-    port = os.environ.get("REDIS_PORT") or ""
+    # Accept both underscored and Railway-plugin names (REDISHOST/REDISPORT/REDISPASSWORD).
+    host = os.environ.get("REDIS_HOST") or os.environ.get("REDISHOST") or ""
+    port = os.environ.get("REDIS_PORT") or os.environ.get("REDISPORT") or ""
+    password = os.environ.get("REDIS_PASSWORD") or os.environ.get("REDISPASSWORD") or None
     if not host or not port:
         return {
             "status": "unconfigured",
-            "reason": "REDIS_HOST or REDIS_PORT is not set; chat runs without memory.",
+            "reason": "Neither REDIS_HOST/REDIS_PORT nor REDISHOST/REDISPORT are set; chat runs without memory.",
         }
 
     t0 = time.perf_counter()
@@ -125,7 +127,7 @@ def healthz_redis() -> dict[str, Any]:
             host=host,
             port=int(port),
             db=0,
-            password=os.environ.get("REDIS_PASSWORD") or None,
+            password=password,
             decode_responses=True,
             socket_connect_timeout=3,
             socket_timeout=3,
@@ -141,6 +143,7 @@ def healthz_redis() -> dict[str, Any]:
             "status": "ok",
             "host": host,
             "port": port,
+            "password_set": bool(password),
             "latency_ms": int((time.perf_counter() - t0) * 1000),
             "message_keys": message_keys,
             "summary_keys": summary_keys,
@@ -151,6 +154,7 @@ def healthz_redis() -> dict[str, Any]:
             "status": "error",
             "host": host,
             "port": port,
+            "password_set": bool(password),
             "reason": f"{type(exc).__name__}: {exc}",
         }
 

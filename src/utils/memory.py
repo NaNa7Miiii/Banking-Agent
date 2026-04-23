@@ -68,8 +68,21 @@ class RedisTrimmingSummaryBufferMemory(ConversationSummaryBufferMemory):
 
 load_env()
 
-REDIS_HOST = get_env("REDIS_HOST") or "localhost"
-REDIS_PORT = get_env("REDIS_PORT") or "6379"
+
+def _resolve_redis_settings() -> tuple[str, str, str | None]:
+    """
+    Accept both ``REDIS_HOST`` / ``REDIS_PORT`` / ``REDIS_PASSWORD`` *and* the
+    no-underscore variants (``REDISHOST`` / ``REDISPORT`` / ``REDISPASSWORD``)
+    that Railway's Redis plugin auto-injects. The underscored form wins if both
+    are set.
+    """
+    host = get_env("REDIS_HOST") or get_env("REDISHOST") or "localhost"
+    port = get_env("REDIS_PORT") or get_env("REDISPORT") or "6379"
+    password = get_env("REDIS_PASSWORD") or get_env("REDISPASSWORD") or None
+    return host, port, password
+
+
+REDIS_HOST, REDIS_PORT, REDIS_PASSWORD = _resolve_redis_settings()
 
 
 def get_memory_key(customer_id_number: str, session_id: str) -> str:
@@ -88,12 +101,17 @@ def _get_redis_client():
         host=REDIS_HOST,
         port=int(REDIS_PORT),
         db=0,
-        password=None,
+        password=REDIS_PASSWORD,
         decode_responses=True,
     )
 
 
 def _get_redis_url() -> str:
+    if REDIS_PASSWORD:
+        # URL-escape the password so special chars (e.g. '/', '@', '#') don't
+        # break the URL parser used by RedisChatMessageHistory.
+        from urllib.parse import quote
+        return f"redis://:{quote(REDIS_PASSWORD, safe='')}@{REDIS_HOST}:{REDIS_PORT}/0"
     return f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 
