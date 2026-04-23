@@ -31,6 +31,7 @@
       --radius-lg: 16px;
       --shadow-sm: 0 1px 2px rgba(70, 50, 20, 0.06);
       --shadow-md: 0 10px 30px rgba(80, 55, 20, 0.12);
+      --sidebar-w: 268px;
     }
 
     * { box-sizing: border-box; }
@@ -49,49 +50,184 @@
       overflow: hidden;
     }
 
-    /* ── Layout shell ───────────────────────────────────────────── */
-    .app { display: flex; flex-direction: column; height: 100vh; }
-
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 24px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(253, 248, 236, 0.78);
-      backdrop-filter: saturate(160%) blur(14px);
-      z-index: 10;
+    /* ── App shell: sidebar + main ──────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      height: 100vh;
+      transition: grid-template-columns 240ms cubic-bezier(.4, 0, .2, 1);
     }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .logo {
-      width: 30px; height: 30px; border-radius: 999px;
+    .app.sidebar-collapsed { grid-template-columns: 0 1fr; }
+
+    /* ── Sidebar ────────────────────────────────────────────────── */
+    .sidebar {
+      background: linear-gradient(180deg, rgba(241, 232, 212, 0.8), rgba(241, 232, 212, 0.95));
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
       overflow: hidden;
-      border: 1px solid var(--border-strong);
-      background: var(--surface);
+      min-width: 0;
+    }
+    .sidebar-head {
+      padding: 16px 16px 12px;
+      display: flex; align-items: center; gap: 10px;
       flex-shrink: 0;
     }
-    .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .brand-name { font-weight: 600; letter-spacing: -0.01em; }
+    .sidebar-head .logo {
+      width: 30px; height: 30px; border-radius: 999px;
+      overflow: hidden; flex-shrink: 0;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+    }
+    .sidebar-head .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .sidebar-head .brand-name { font-weight: 600; letter-spacing: -0.01em; font-size: 14.5px; }
 
-    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .new-chat-btn {
+      margin: 4px 12px 10px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      font: inherit; font-size: 13.5px; font-weight: 500;
+      color: var(--ink);
+      transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+      flex-shrink: 0;
+    }
+    .new-chat-btn:hover {
+      background: #fffdf6; border-color: var(--accent-soft);
+      box-shadow: var(--shadow-sm);
+    }
+    .new-chat-btn svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
 
-    .chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 10px; border-radius: 8px;
-      background: var(--surface); border: 1px solid var(--border);
+    .session-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px 14px;
+      min-height: 0;
+    }
+    .session-list::-webkit-scrollbar { width: 6px; }
+    .session-list::-webkit-scrollbar-thumb { background: rgba(60, 40, 20, 0.16); border-radius: 6px; }
+    .session-list::-webkit-scrollbar-thumb:hover { background: rgba(60, 40, 20, 0.28); }
+
+    .session-group-label {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-faint);
+      padding: 10px 8px 4px;
+      font-weight: 600;
+    }
+    .session-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--ink-dim);
+      font-size: 13.5px;
+      line-height: 1.3;
+      margin: 1px 0;
+      transition: background 120ms ease, color 120ms ease;
+      position: relative;
+    }
+    .session-item:hover { background: rgba(253, 248, 236, 0.7); color: var(--ink); }
+    .session-item.active {
+      background: var(--surface); color: var(--ink);
+      box-shadow: inset 0 0 0 1px var(--border-strong);
+    }
+    .session-item-title {
+      flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .session-item-actions {
+      display: none;
+      gap: 1px;
+      flex-shrink: 0;
+    }
+    .session-item:hover .session-item-actions,
+    .session-item.active .session-item-actions { display: inline-flex; }
+    .session-act {
+      background: transparent; border: 0; cursor: pointer;
+      width: 24px; height: 24px; border-radius: 6px;
+      color: var(--ink-faint);
+      display: grid; place-items: center;
+      padding: 0;
+      transition: background 120ms ease, color 120ms ease;
+    }
+    .session-act:hover { background: var(--bg-soft); color: var(--accent); }
+    .session-act svg { width: 13px; height: 13px; }
+
+    .session-empty {
+      padding: 16px 12px;
+      font-size: 12.5px;
+      color: var(--ink-faint);
+      text-align: center;
+    }
+
+    .sidebar-foot {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .sidebar-foot .chip {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
       font-size: 12.5px; color: var(--ink-dim);
     }
-    .chip input {
-      background: transparent; border: none; color: var(--ink);
-      font: inherit; outline: none; width: 120px;
+    .sidebar-foot .chip input {
+      flex: 1; min-width: 0;
+      background: transparent; border: none; outline: none;
+      color: var(--ink); font: inherit;
       font-variant-numeric: tabular-nums;
     }
-    .chip input::placeholder { color: var(--ink-faint); }
-    .chip-label { color: var(--ink-faint); font-weight: 500; }
+    .sidebar-foot .chip input::placeholder { color: var(--ink-faint); }
+    .sidebar-foot .chip-label { color: var(--ink-faint); font-weight: 500; flex-shrink: 0; }
+
+    /* ── Main column ────────────────────────────────────────────── */
+    .main {
+      display: flex; flex-direction: column;
+      min-width: 0; min-height: 0;
+      position: relative;
+    }
+
+    .topbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(253, 248, 236, 0.72);
+      backdrop-filter: saturate(160%) blur(14px);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .topbar .current-title {
+      flex: 1; min-width: 0;
+      font-weight: 600; letter-spacing: -0.01em;
+      font-size: 15px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: var(--ink);
+    }
+
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: transparent; border: 1px solid transparent;
+      cursor: pointer; display: grid; place-items: center;
+      color: var(--ink-dim);
+      flex-shrink: 0;
+      transition: background 120ms ease, color 120ms ease;
+    }
+    .icon-btn:hover { background: var(--bg-soft); color: var(--ink); }
+    .icon-btn svg { width: 18px; height: 18px; }
 
     .status-pill {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 5px 10px; border-radius: 999px;
       border: 1px solid var(--border); background: var(--surface);
       font-size: 11.5px; color: var(--ink-dim);
+      flex-shrink: 0;
     }
     .status-pill .dot {
       width: 6px; height: 6px; border-radius: 999px;
@@ -99,14 +235,14 @@
       box-shadow: 0 0 8px rgba(75, 138, 75, 0.45);
     }
 
-    /* ── Conversation area ───────────────────────────────────────── */
-    .stage { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+    /* ── Conversation area ──────────────────────────────────────── */
+    .stage { flex: 1; overflow-y: auto; scroll-behavior: smooth; min-height: 0; }
     .stage::-webkit-scrollbar { width: 10px; }
     .stage::-webkit-scrollbar-track { background: transparent; }
     .stage::-webkit-scrollbar-thumb { background: rgba(60, 40, 20, 0.12); border-radius: 10px; }
     .stage::-webkit-scrollbar-thumb:hover { background: rgba(60, 40, 20, 0.22); }
 
-    .stream { max-width: 760px; margin: 0 auto; padding: 24px 24px 140px; }
+    .stream { max-width: 760px; margin: 0 auto; padding: 24px 24px 160px; }
 
     /* Empty / splash state */
     .splash { text-align: center; padding: 64px 20px 40px; }
@@ -300,20 +436,60 @@
     }
     .raw-toggle:hover { color: var(--ink-dim); }
 
-    /* Thinking state */
+    /* ── Live "thinking" status ─────────────────────────────────── */
     .thinking {
-      display: inline-flex; align-items: center; gap: 8px;
-      color: var(--ink-dim); font-size: 14px;
+      display: flex; flex-direction: column; gap: 10px;
     }
-    .thinking .shimmer {
-      background: linear-gradient(90deg, var(--ink-faint), var(--ink), var(--ink-faint));
+    .thinking-pill {
+      display: inline-flex; align-items: center; gap: 10px;
+      align-self: flex-start;
+      padding: 6px 12px 6px 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 12.5px; color: var(--ink-dim);
+      box-shadow: var(--shadow-sm);
+    }
+    .thinking-pill .spinner {
+      width: 12px; height: 12px;
+      border: 2px solid var(--accent-soft);
+      border-top-color: var(--accent);
+      border-radius: 999px;
+      animation: spin 0.9s linear infinite;
+      flex-shrink: 0;
+    }
+    .thinking-pill .thinking-label {
+      background: linear-gradient(90deg, var(--ink-dim), var(--ink), var(--ink-dim));
       background-size: 200% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      animation: shimmer 1.8s linear infinite;
+      animation: shimmer 2.2s linear infinite;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+    .progress-log {
+      display: flex; flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--ink-faint);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      padding-left: 2px;
+    }
+    .progress-log .item {
+      display: flex; align-items: center; gap: 8px;
+      animation: slide-in 260ms ease-out;
+    }
+    .progress-log .item .check {
+      width: 14px; text-align: center; flex-shrink: 0;
+    }
+    .progress-log .item.ok .check { color: var(--ok); }
+    .progress-log .item.err .check { color: var(--err); }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateX(-4px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
 
     /* ── Composer ──────────────────────────────────────────────── */
     .composer-wrap {
@@ -387,221 +563,361 @@
       white-space: pre-wrap; word-break: break-word;
     }
 
-    @media (max-width: 640px) {
+    /* Mobile: sidebar becomes an overlay */
+    .scrim {
+      position: fixed; inset: 0;
+      background: rgba(60, 40, 20, 0.32);
+      opacity: 0; pointer-events: none;
+      transition: opacity 220ms ease;
+      z-index: 15;
+    }
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 0 1fr; }
+      .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0;
+        width: var(--sidebar-w);
+        z-index: 20;
+        transform: translateX(-100%);
+        transition: transform 220ms cubic-bezier(.4, 0, .2, 1);
+        box-shadow: none;
+      }
+      .app.sidebar-open .sidebar {
+        transform: translateX(0);
+        box-shadow: 0 0 40px rgba(80, 55, 20, 0.22);
+      }
+      .app.sidebar-open .scrim { opacity: 1; pointer-events: auto; }
       .topbar { padding: 12px 16px; }
-      .stream { padding: 16px 16px 140px; }
+      .stream { padding: 16px 16px 160px; }
       .composer-wrap { padding: 12px 16px 18px; }
       .splash { padding: 40px 10px 20px; }
       .splash h1 { font-size: 24px; }
-      .chip input { width: 90px; }
+    }
+    /* Desktop: hide hamburger when sidebar visible */
+    @media (min-width: 761px) {
+      .app:not(.sidebar-collapsed) .icon-btn.mobile-only { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <div class="brand">
+  <div class="app" id="app">
+    <div class="scrim" id="scrim"></div>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
         <div class="logo"><img src="/agent-avatar.jpg" alt="" /></div>
         <div class="brand-name">Banking Agent</div>
       </div>
-      <div class="topbar-actions">
+      <button class="new-chat-btn" id="new-chat" type="button">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+        </svg>
+        <span>New chat</span>
+      </button>
+      <div class="session-list" id="session-list"></div>
+      <div class="sidebar-foot">
         <label class="chip" title="Your credit card / customer identifier">
           <span class="chip-label">ID</span>
           <input id="customer" placeholder="cc_num" autocomplete="off" />
         </label>
-        <span class="status-pill" id="status-pill" title="Service status">
-          <span class="dot"></span>Live
-        </span>
       </div>
-    </header>
+    </aside>
 
-    <div class="stage" id="stage">
-      <div class="stream" id="stream">
-        <div class="splash" id="splash">
-          <div class="splash-avatar"><img src="/agent-avatar.jpg" alt="" /></div>
-          <h1>What can I help you with?</h1>
-          <p>Ask about your transactions, CIBC products, or check for suspicious activity. Answers cite the sources and show the steps taken.</p>
-          <div class="suggest-grid">
-            <button class="suggest" data-prompt="How much did I spend last month?">
-              <div class="tag">Spending</div>
-              How much did I spend last month?
-            </button>
-            <button class="suggest" data-prompt="List my spending categories for June 2020 and highlight the five largest transactions.">
-              <div class="tag">Analytics</div>
-              List my spending categories and the five largest transactions.
-            </button>
-            <button class="suggest" data-prompt="Were any of my transactions last year suspicious or fraudulent?">
-              <div class="tag">Fraud</div>
-              Check my recent transactions for fraud risk.
-            </button>
-            <button class="suggest" data-prompt="What does the CIBC Aventura Gold travel insurance certificate cover?">
-              <div class="tag">Policies</div>
-              What does the Aventura Gold travel insurance cover?
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="composer-wrap">
-      <form class="composer" id="composer" autocomplete="off">
-        <textarea
-          id="msg"
-          rows="1"
-          placeholder="Ask anything about your accounts or CIBC products..."
-          autofocus
-        ></textarea>
-        <button type="submit" class="send-btn" id="send" aria-label="Send">
-          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2.5 8H13.5M13.5 8L9 3.5M13.5 8L9 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn" id="sidebar-toggle" aria-label="Toggle sidebar" type="button">
+          <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           </svg>
         </button>
-      </form>
-      <div class="composer-hint">
-        <span class="kbd">Enter</span> to send · <span class="kbd">Shift</span> + <span class="kbd">Enter</span> for newline
+        <div class="current-title" id="current-title">New chat</div>
+        <span class="status-pill" title="Service status"><span class="dot"></span>Live</span>
+      </header>
+
+      <div class="stage" id="stage">
+        <div class="stream" id="stream"></div>
       </div>
-    </div>
+
+      <div class="composer-wrap">
+        <form class="composer" id="composer" autocomplete="off">
+          <textarea
+            id="msg"
+            rows="1"
+            placeholder="Ask anything about your accounts or CIBC products..."
+            autofocus
+          ></textarea>
+          <button type="submit" class="send-btn" id="send" aria-label="Send">
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.5 8H13.5M13.5 8L9 3.5M13.5 8L9 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </form>
+        <div class="composer-hint">
+          <span class="kbd">Enter</span> to send · <span class="kbd">Shift</span> + <span class="kbd">Enter</span> for newline
+        </div>
+      </div>
+    </main>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const stage = $("stage");
-    const stream = $("stream");
-    const splash = $("splash");
-    const composer = $("composer");
-    const msg = $("msg");
-    const send = $("send");
 
-    // Persist customer id locally so reloads don't lose it
-    const LS_KEY = "bank_agent.customer_id";
-    const savedId = localStorage.getItem(LS_KEY);
-    if (savedId) $("customer").value = savedId;
-    $("customer").addEventListener("input", () => localStorage.setItem(LS_KEY, $("customer").value));
+    /* ──────────────────────────────────────────────────────────────
+     * Session store (localStorage)
+     * Each session has a stable id that is also used as the backend
+     * session_id, so if Redis memory is enabled the same conversation
+     * thread on the server lines up with the browser-side transcript.
+     * ──────────────────────────────────────────────────────────── */
+    const STORE_KEY = "banking_agent_sessions_v1";
+    const CID_KEY   = "bank_agent.customer_id";
 
-    // One session id per page load so conversational memory stays consistent across turns.
-    const sessionId = (crypto.randomUUID && crypto.randomUUID()) ||
-      "s-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-    // Auto-grow textarea
-    function autogrow() {
-      msg.style.height = "auto";
-      msg.style.height = Math.min(msg.scrollHeight, 200) + "px";
-    }
-    msg.addEventListener("input", autogrow);
-
-    // Submit on Enter (not Shift+Enter)
-    msg.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
-        e.preventDefault();
-        composer.dispatchEvent(new Event("submit", { cancelable: true }));
-      }
-    });
-
-    // Suggestion buttons
-    document.querySelectorAll(".suggest").forEach((el) => {
-      el.addEventListener("click", () => {
-        msg.value = el.dataset.prompt;
-        autogrow();
-        msg.focus();
-      });
-    });
-
-    composer.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const text = msg.value.trim();
-      if (!text || send.disabled) return;
-
-      if (splash) splash.remove();
-
-      renderUserTurn(text);
-      const agentTurn = renderAgentThinking();
-
-      msg.value = "";
-      autogrow();
-      send.disabled = true;
-
+    function loadStore() {
       try {
-        const r = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            customer_id: $("customer").value || "",
-            session_id: sessionId,
-          }),
-        });
-        const j = await r.json();
-        if (j.error) {
-          renderAgentError(agentTurn, j);
-        } else {
-          renderAgentAnswer(agentTurn, j);
-        }
-      } catch (err) {
-        renderAgentError(agentTurn, { error: String(err), trace_id: "-", latency_ms: 0 });
-      } finally {
-        send.disabled = false;
-        msg.focus();
-      }
-    });
+        const raw = localStorage.getItem(STORE_KEY);
+        if (!raw) return { sessions: [], activeId: null };
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.sessions)) return { sessions: [], activeId: null };
+        return parsed;
+      } catch { return { sessions: [], activeId: null }; }
+    }
+    function saveStore(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
 
-    function renderUserTurn(text) {
+    function newSessionId() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return "s-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    }
+    function createSession(title) {
+      const now = Date.now();
+      return { id: newSessionId(), title: title || "New chat", createdAt: now, updatedAt: now, messages: [] };
+    }
+
+    const store = loadStore();
+    if (!store.sessions.length) {
+      const s = createSession();
+      store.sessions.push(s);
+      store.activeId = s.id;
+      saveStore(store);
+    } else if (!store.activeId || !store.sessions.find((x) => x.id === store.activeId)) {
+      store.activeId = store.sessions[0].id;
+      saveStore(store);
+    }
+    const getActive = () => store.sessions.find((s) => s.id === store.activeId);
+
+    /* ──────────────────────────────────────────────────────────────
+     * Customer ID (shared across sessions)
+     * ──────────────────────────────────────────────────────────── */
+    const savedId = localStorage.getItem(CID_KEY);
+    if (savedId) $("customer").value = savedId;
+    $("customer").addEventListener("input", () => localStorage.setItem(CID_KEY, $("customer").value));
+
+    /* ──────────────────────────────────────────────────────────────
+     * Sidebar rendering
+     * ──────────────────────────────────────────────────────────── */
+    const sessionListEl = $("session-list");
+
+    function renderSessionList() {
+      sessionListEl.innerHTML = "";
+      if (!store.sessions.length) {
+        sessionListEl.innerHTML = '<div class="session-empty">No conversations yet</div>';
+        return;
+      }
+      const sorted = [...store.sessions].sort((a, b) => b.updatedAt - a.updatedAt);
+      const header = document.createElement("div");
+      header.className = "session-group-label";
+      header.textContent = "Conversations";
+      sessionListEl.appendChild(header);
+
+      sorted.forEach((s) => {
+        const el = document.createElement("div");
+        el.className = "session-item" + (s.id === store.activeId ? " active" : "");
+        el.innerHTML =
+          '<span class="session-item-title"></span>' +
+          '<span class="session-item-actions">' +
+            '<button class="session-act" data-act="rename" title="Rename" type="button">' +
+              '<svg viewBox="0 0 16 16" fill="none"><path d="M3 13l3-.8 7-7-2.2-2.2-7 7L3 13z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>' +
+            '</button>' +
+            '<button class="session-act" data-act="delete" title="Delete" type="button">' +
+              '<svg viewBox="0 0 16 16" fill="none"><path d="M4 5h8M6.5 3h3M5 5l.5 8a1 1 0 001 1h3a1 1 0 001-1L11 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+            '</button>' +
+          '</span>';
+        el.querySelector(".session-item-title").textContent = s.title || "New chat";
+
+        el.addEventListener("click", (e) => {
+          if (e.target.closest(".session-act")) return;
+          switchSession(s.id);
+        });
+        el.querySelector('[data-act="rename"]').addEventListener("click", (e) => {
+          e.stopPropagation();
+          const next = prompt("Rename conversation:", s.title || "");
+          if (next !== null && next.trim()) {
+            s.title = next.trim().slice(0, 80);
+            s.updatedAt = Date.now();
+            saveStore(store);
+            renderSessionList();
+            if (s.id === store.activeId) $("current-title").textContent = s.title;
+          }
+        });
+        el.querySelector('[data-act="delete"]').addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!confirm('Delete "' + (s.title || "this conversation") + '"?')) return;
+          store.sessions = store.sessions.filter((x) => x.id !== s.id);
+          if (store.activeId === s.id) {
+            if (store.sessions.length) {
+              store.activeId = store.sessions[0].id;
+            } else {
+              const fresh = createSession();
+              store.sessions.push(fresh);
+              store.activeId = fresh.id;
+            }
+          }
+          saveStore(store);
+          renderSessionList();
+          renderActiveTranscript();
+        });
+        sessionListEl.appendChild(el);
+      });
+    }
+
+    function switchSession(id) {
+      if (id === store.activeId) return;
+      store.activeId = id;
+      saveStore(store);
+      renderSessionList();
+      renderActiveTranscript();
+      $("app").classList.remove("sidebar-open");
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     * Conversation rendering
+     * ──────────────────────────────────────────────────────────── */
+    const streamEl = $("stream");
+    const stage    = $("stage");
+    const composer = $("composer");
+    const msg      = $("msg");
+    const send     = $("send");
+
+    const AVATAR_HTML = '<div class="avatar"><img src="/agent-avatar.jpg" alt="" /></div>';
+
+    const SPLASH_HTML =
+      '<div class="splash" id="splash">' +
+        '<div class="splash-avatar"><img src="/agent-avatar.jpg" alt="" /></div>' +
+        '<h1>What can I help you with?</h1>' +
+        '<p>Ask about your transactions, CIBC products, or check for suspicious activity. Answers cite sources and show the steps taken.</p>' +
+        '<div class="suggest-grid">' +
+          '<button class="suggest" type="button" data-prompt="How much did I spend last month?">' +
+            '<div class="tag">Spending</div>How much did I spend last month?</button>' +
+          '<button class="suggest" type="button" data-prompt="List my spending categories for June 2020 and highlight the five largest transactions.">' +
+            '<div class="tag">Analytics</div>List my spending categories and the five largest transactions.</button>' +
+          '<button class="suggest" type="button" data-prompt="Were any of my transactions last year suspicious or fraudulent?">' +
+            '<div class="tag">Fraud</div>Check my recent transactions for fraud risk.</button>' +
+          '<button class="suggest" type="button" data-prompt="What does the CIBC Aventura Gold travel insurance certificate cover?">' +
+            '<div class="tag">Policies</div>What does the Aventura Gold travel insurance cover?</button>' +
+        '</div>' +
+      '</div>';
+
+    function wireSuggestions() {
+      document.querySelectorAll(".suggest").forEach((el) => {
+        el.addEventListener("click", () => {
+          msg.value = el.dataset.prompt;
+          autogrow();
+          msg.focus();
+        });
+      });
+    }
+
+    function renderActiveTranscript() {
+      const s = getActive();
+      streamEl.innerHTML = "";
+      $("current-title").textContent = s.title || "New chat";
+      if (!s.messages.length) {
+        streamEl.innerHTML = SPLASH_HTML;
+        wireSuggestions();
+        return;
+      }
+      for (const m of s.messages) {
+        if (m.role === "user") {
+          appendUserTurn(m.content);
+        } else if (m.role === "agent") {
+          const turn = appendAgentBubble();
+          if (m.error) {
+            renderAgentError(turn, { error: m.error, trace_id: m.trace_id || "-", latency_ms: m.latency_ms || 0 });
+          } else {
+            renderAgentAnswer(turn, {
+              final_answer: m.final_answer,
+              plan: m.plan,
+              step_results: m.step_results || {},
+              latency_ms: m.latency_ms || 0,
+              trace_id: m.trace_id || "-",
+            });
+          }
+        }
+      }
+      scrollToBottom();
+    }
+
+    function appendUserTurn(text) {
       const div = document.createElement("div");
       div.className = "turn turn-user";
       const bubble = document.createElement("div");
       bubble.className = "bubble-user";
       bubble.textContent = text;
       div.appendChild(bubble);
-      stream.appendChild(div);
-      scrollToBottom();
-    }
-
-    const AVATAR_HTML = '<div class="avatar"><img src="/agent-avatar.jpg" alt="" /></div>';
-
-    function renderAgentThinking() {
-      const div = document.createElement("div");
-      div.className = "turn turn-agent";
-      div.innerHTML = AVATAR_HTML +
-        '<div class="agent-col">' +
-          '<div class="thinking"><span class="shimmer">Thinking…</span></div>' +
-        '</div>';
-      stream.appendChild(div);
+      streamEl.appendChild(div);
       scrollToBottom();
       return div;
     }
 
+    function appendAgentBubble() {
+      const div = document.createElement("div");
+      div.className = "turn turn-agent";
+      div.innerHTML = AVATAR_HTML + '<div class="agent-col"></div>';
+      streamEl.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    function renderAgentThinking(turnEl) {
+      const col = turnEl.querySelector(".agent-col");
+      col.innerHTML =
+        '<div class="thinking">' +
+          '<span class="thinking-pill">' +
+            '<span class="spinner"></span>' +
+            '<span class="thinking-label">Thinking…</span>' +
+          '</span>' +
+          '<div class="progress-log"></div>' +
+        '</div>';
+      scrollToBottom();
+    }
+
     function renderAgentAnswer(turnEl, j) {
+      const col = turnEl.querySelector(".agent-col");
       const md = j.final_answer || "*(no answer was generated)*";
       const answerHtml = window.marked ? window.marked.parse(md) : escapeHtml(md);
       const stepCount = Object.keys(j.step_results || {}).length;
       const secs = (j.latency_ms / 1000).toFixed(1);
-
       const planText = j.plan ? JSON.stringify(j.plan, null, 2) : "";
       const stepsHtml = buildStepsHtml(j.step_results || {});
       const hasReasoning = stepCount > 0 || !!j.plan;
 
-      turnEl.innerHTML = AVATAR_HTML +
-        '<div class="agent-col">' +
-          '<div class="answer">' + answerHtml + '</div>' +
-          (hasReasoning ? (
-            '<details class="reasoning">' +
-              '<summary>Reasoning · ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') + ' · ' + secs + 's</summary>' +
-              '<div class="reasoning-body">' +
-                stepsHtml +
-                (planText ? (
-                  '<span class="raw-toggle" data-toggle="plan">Show plan (JSON)</span>' +
-                  '<pre class="plan-json" hidden>' + escapeHtml(planText) + '</pre>'
-                ) : '') +
-              '</div>' +
-            '</details>'
-          ) : '') +
-          '<div class="agent-meta">' +
-            '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
-            '<span class="sep">·</span>' +
-            '<span>' + secs + 's</span>' +
-          '</div>' +
+      col.innerHTML =
+        '<div class="answer">' + answerHtml + '</div>' +
+        (hasReasoning ?
+          '<details class="reasoning">' +
+            '<summary>Reasoning · ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') + ' · ' + secs + 's</summary>' +
+            '<div class="reasoning-body">' +
+              stepsHtml +
+              (planText ?
+                '<span class="raw-toggle" data-toggle="plan">Show plan (JSON)</span>' +
+                '<pre class="plan-json" hidden>' + escapeHtml(planText) + '</pre>'
+                : '') +
+            '</div>' +
+          '</details>' : '') +
+        '<div class="agent-meta">' +
+          '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
+          '<span class="sep">·</span>' +
+          '<span>' + secs + 's</span>' +
         '</div>';
 
-      turnEl.querySelectorAll(".raw-toggle").forEach((el) => {
+      col.querySelectorAll(".raw-toggle").forEach((el) => {
         el.addEventListener("click", () => {
           const pre = el.nextElementSibling;
           if (!pre) return;
@@ -610,13 +926,12 @@
           else { pre.removeAttribute("hidden"); el.textContent = "Hide plan"; }
         });
       });
-
       scrollToBottom();
     }
 
     function buildStepsHtml(stepResults) {
       const entries = Object.entries(stepResults || {});
-      if (entries.length === 0) return '';
+      if (!entries.length) return '';
       return entries.map(([sid, sr]) => {
         const ok = (sr && sr.status) === "ok";
         const owner = (sr && sr.owner) || "";
@@ -637,13 +952,12 @@
     }
 
     function renderAgentError(turnEl, j) {
-      turnEl.innerHTML = AVATAR_HTML +
-        '<div class="agent-col">' +
-          '<div class="err-box">' + escapeHtml(j.error || "Something went wrong.") + '</div>' +
-          '<div class="agent-meta">' +
-            '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
-            (j.latency_ms ? '<span class="sep">·</span><span>' + (j.latency_ms / 1000).toFixed(1) + 's</span>' : '') +
-          '</div>' +
+      const col = turnEl.querySelector(".agent-col");
+      col.innerHTML =
+        '<div class="err-box">' + escapeHtml(j.error || "Something went wrong.") + '</div>' +
+        '<div class="agent-meta">' +
+          '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
+          (j.latency_ms ? '<span class="sep">·</span><span>' + (j.latency_ms / 1000).toFixed(1) + 's</span>' : '') +
         '</div>';
       scrollToBottom();
     }
@@ -655,6 +969,182 @@
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
+
+    /* ──────────────────────────────────────────────────────────────
+     * Composer behavior
+     * ──────────────────────────────────────────────────────────── */
+    function autogrow() {
+      msg.style.height = "auto";
+      msg.style.height = Math.min(msg.scrollHeight, 200) + "px";
+    }
+    msg.addEventListener("input", autogrow);
+    msg.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        composer.dispatchEvent(new Event("submit", { cancelable: true }));
+      }
+    });
+
+    composer.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = msg.value.trim();
+      if (!text || send.disabled) return;
+
+      const s = getActive();
+
+      // Hide splash if this is the first message
+      const splash = document.getElementById("splash");
+      if (splash) splash.remove();
+
+      appendUserTurn(text);
+      const agentTurn = appendAgentBubble();
+      renderAgentThinking(agentTurn);
+
+      // Persist user message immediately so refresh doesn't lose it
+      s.messages.push({ role: "user", content: text });
+      if (!s.title || s.title === "New chat") {
+        s.title = text.slice(0, 60);
+        $("current-title").textContent = s.title;
+      }
+      s.updatedAt = Date.now();
+      saveStore(store);
+      renderSessionList();
+
+      msg.value = "";
+      autogrow();
+      send.disabled = true;
+
+      const agentMsg = {
+        role: "agent",
+        final_answer: null, plan: null, step_results: {},
+        trace_id: "-", latency_ms: 0, error: null,
+      };
+
+      try {
+        await streamChat(text, s.id, $("customer").value || "", agentTurn, agentMsg);
+      } catch (err) {
+        agentMsg.error = String(err && err.message || err);
+        renderAgentError(agentTurn, { error: agentMsg.error, trace_id: agentMsg.trace_id, latency_ms: agentMsg.latency_ms });
+      } finally {
+        s.messages.push(agentMsg);
+        s.updatedAt = Date.now();
+        saveStore(store);
+        renderSessionList();
+        send.disabled = false;
+        msg.focus();
+      }
+    });
+
+    async function streamChat(text, sessionId, customerId, turnEl, agentMsg) {
+      const resp = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify({ message: text, customer_id: customerId, session_id: sessionId }),
+      });
+      if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const thinkingLabelEl = turnEl.querySelector(".thinking-label");
+      const progressLogEl   = turnEl.querySelector(".progress-log");
+
+      function handleEvent(ev) {
+        if (!ev || !ev.type) return;
+        if (ev.type === "trace") { agentMsg.trace_id = ev.trace_id || "-"; return; }
+        if (ev.type === "status") {
+          if (thinkingLabelEl) thinkingLabelEl.textContent = ev.label || "Thinking…";
+          return;
+        }
+        if (ev.type === "plan") { agentMsg.plan = ev.plan; return; }
+        if (ev.type === "step_done") {
+          if (!progressLogEl) return;
+          const item = document.createElement("div");
+          const ok = ev.status === "ok";
+          item.className = "item " + (ok ? "ok" : "err");
+          item.innerHTML =
+            '<span class="check">' + (ok ? "✓" : "✗") + '</span>' +
+            '<span>' + escapeHtml(ev.owner_label || ev.step_id || "step") + '</span>';
+          progressLogEl.appendChild(item);
+          scrollToBottom();
+          return;
+        }
+        if (ev.type === "error") {
+          agentMsg.error = ev.error || "Unknown error.";
+          agentMsg.latency_ms = ev.latency_ms || 0;
+          renderAgentError(turnEl, { error: agentMsg.error, trace_id: agentMsg.trace_id, latency_ms: agentMsg.latency_ms });
+          return;
+        }
+        if (ev.type === "final") {
+          agentMsg.final_answer = ev.final_answer;
+          agentMsg.plan = ev.plan || agentMsg.plan;
+          agentMsg.step_results = ev.step_results || {};
+          agentMsg.latency_ms = ev.latency_ms || 0;
+          renderAgentAnswer(turnEl, {
+            final_answer: ev.final_answer,
+            plan: agentMsg.plan,
+            step_results: agentMsg.step_results,
+            latency_ms: agentMsg.latency_ms,
+            trace_id: agentMsg.trace_id,
+          });
+          return;
+        }
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buffer.indexOf("\n\n")) !== -1) {
+          const frame = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          let data = "";
+          for (const line of frame.split("\n")) {
+            if (line.startsWith("data: ")) data += line.slice(6);
+            else if (line.startsWith("data:"))  data += line.slice(5);
+          }
+          if (!data) continue;
+          let ev;
+          try { ev = JSON.parse(data); } catch { continue; }
+          handleEvent(ev);
+        }
+      }
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     * Sidebar controls
+     * ──────────────────────────────────────────────────────────── */
+    $("new-chat").addEventListener("click", () => {
+      const s = createSession();
+      store.sessions.unshift(s);
+      store.activeId = s.id;
+      saveStore(store);
+      renderSessionList();
+      renderActiveTranscript();
+      msg.focus();
+      $("app").classList.remove("sidebar-open");
+    });
+
+    $("sidebar-toggle").addEventListener("click", () => {
+      const appEl = $("app");
+      // On narrow screens use the overlay class; on wide, collapse the grid column.
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        appEl.classList.toggle("sidebar-open");
+      } else {
+        appEl.classList.toggle("sidebar-collapsed");
+      }
+    });
+    $("scrim").addEventListener("click", () => {
+      $("app").classList.remove("sidebar-open");
+    });
+
+    /* ──────────────────────────────────────────────────────────────
+     * Boot
+     * ──────────────────────────────────────────────────────────── */
+    renderSessionList();
+    renderActiveTranscript();
   </script>
 </body>
 </html>

@@ -22,9 +22,11 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import json
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -130,6 +132,59 @@ def chat(req: ChatRequest) -> ChatResponse:
         plan=result.get("plan"),
         step_results=result.get("step_results"),
         latency_ms=latency_ms,
+    )
+
+
+@app.post("/api/chat/stream")
+def chat_stream(req: ChatRequest):
+    """
+    SSE variant of ``/api/chat``. Emits ``status`` / ``plan`` / ``step_done`` / ``final``
+    events as the runtime graph advances so the UI can show live progress instead of
+    a silent spinner. Each SSE data frame is a single JSON object.
+    """
+    trace_id = uuid.uuid4().hex[:12]
+    extra = {"trace_id": trace_id}
+    t0 = time.perf_counter()
+    logger.info(
+        "chat_stream: received message len=%s customer=%s session=%s",
+        len(req.message),
+        req.customer_id or "-",
+        req.session_id or "-",
+        extra=extra,
+    )
+
+    def _sse(event: dict) -> str:
+        return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    def event_iter():
+        yield _sse({"type": "trace", "trace_id": trace_id})
+        try:
+            from src.run import run_task_stream  # lazy import
+            for ev in run_task_stream(
+                user_input=req.message,
+                customer_id_number=req.customer_id,
+                session_id=req.session_id,
+            ):
+                yield _sse(ev)
+        except Exception as exc:
+            logger.exception("chat_stream: generator raised", extra=extra)
+            yield _sse({
+                "type": "error",
+                "error": f"{type(exc).__name__}: {exc}",
+                "latency_ms": int((time.perf_counter() - t0) * 1000),
+            })
+        finally:
+            latency_ms = int((time.perf_counter() - t0) * 1000)
+            logger.info("chat_stream: done in %sms", latency_ms, extra=extra)
+
+    return StreamingResponse(
+        event_iter(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",  # disable proxy buffering (nginx / Railway edge)
+            "Connection": "keep-alive",
+        },
     )
 
 
