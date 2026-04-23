@@ -3,129 +3,486 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Banking Agent · Demo</title>
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%230f172a'/><text x='50%25' y='56%25' font-size='32' text-anchor='middle' fill='%2338bdf8' font-family='sans-serif' font-weight='700'>B</text></svg>" />
+  <title>Banking Agent</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2318191c'/><path d='M20 18h18a8 8 0 010 16H20zm0 14h20a8 8 0 010 16H20z' fill='none' stroke='%23e7e8ea' stroke-width='3.5' stroke-linejoin='round'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #121a33;
-      --panel-2: #1a2447;
-      --ink: #e6ecff;
-      --ink-dim: #8ea0c9;
-      --accent: #38bdf8;
-      --accent-2: #6366f1;
-      --ok: #22c55e;
-      --err: #ef4444;
-      --border: #25304f;
+      --bg: #0a0a0b;
+      --surface: #111113;
+      --surface-2: #161619;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --ink: #ededef;
+      --ink-dim: #9a9aa2;
+      --ink-faint: #5a5a63;
+      --accent: #7aa2ff;
+      --ok: #4ade80;
+      --err: #f87171;
+      --warn: #fbbf24;
+      --radius: 12px;
+      --radius-lg: 16px;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
+
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; min-height: 100vh; }
-    body { background: radial-gradient(1200px 600px at 10% -10%, rgba(56,189,248,0.15), transparent 60%), radial-gradient(1000px 500px at 120% 10%, rgba(99,102,241,0.18), transparent 60%), var(--bg); }
-    header { max-width: 900px; margin: 0 auto; padding: 32px 24px 12px; }
-    header h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
-    header p { margin: 0; color: var(--ink-dim); font-size: 14px; }
-    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
-    .card { background: rgba(18, 26, 51, 0.75); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-top: 16px; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .row input, .row textarea { flex: 1; min-width: 0; background: var(--panel-2); color: var(--ink); border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; font-size: 14px; font-family: inherit; resize: vertical; }
-    .row textarea { min-height: 70px; }
-    .row input:focus, .row textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56,189,248,0.15); }
-    button { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #06102a; border: 0; padding: 10px 16px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 14px; }
-    button[disabled] { opacity: 0.5; cursor: not-allowed; }
-    .meta { display: flex; gap: 14px; font-size: 12px; color: var(--ink-dim); margin-top: 8px; flex-wrap: wrap; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
-    .badge.ok { color: var(--ok); border-color: rgba(34,197,94,0.4); }
-    .badge.err { color: var(--err); border-color: rgba(239,68,68,0.4); }
-    details { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 10px; background: var(--panel); }
-    details summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink-dim); }
-    details[open] summary { color: var(--ink); }
-    pre { background: #0a1130; border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12px; color: #cde3ff; }
-    .step { padding: 10px; border-left: 3px solid var(--border); margin: 8px 0; background: rgba(10,17,48,0.5); border-radius: 0 8px 8px 0; }
-    .step .step-head { display: flex; gap: 10px; align-items: center; font-size: 13px; }
-    .step .step-body { color: var(--ink-dim); font-size: 12px; margin-top: 4px; white-space: pre-wrap; }
-    .answer { font-size: 15px; line-height: 1.6; }
-    .answer h1, .answer h2, .answer h3 { margin: 16px 0 8px; }
-    .answer code { background: #0a1130; padding: 1px 6px; border-radius: 6px; font-size: 13px; }
-    .answer pre code { background: transparent; padding: 0; }
-    .answer table { border-collapse: collapse; margin: 8px 0; }
-    .answer th, .answer td { border: 1px solid var(--border); padding: 6px 10px; font-size: 13px; }
-    .muted { color: var(--ink-dim); font-size: 12px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
-    .status-dot.ok { background: var(--ok); }
-    .status-dot.err { background: var(--err); }
-    .empty { color: var(--ink-dim); text-align: center; padding: 36px 10px; font-size: 14px; }
-    footer { color: var(--ink-dim); font-size: 12px; text-align: center; padding: 16px; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+    }
+
+    /* ── Layout shell ───────────────────────────────────────────── */
+    .app { display: flex; flex-direction: column; height: 100vh; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10, 10, 11, 0.7);
+      backdrop-filter: saturate(140%) blur(12px);
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, #2a2a2f, #18191c);
+      border: 1px solid var(--border-strong);
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 14px; color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+    .brand-name { font-weight: 600; letter-spacing: -0.01em; }
+
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 12.5px; color: var(--ink-dim);
+    }
+    .chip input {
+      background: transparent; border: none; color: var(--ink);
+      font: inherit; outline: none; width: 120px;
+      font-variant-numeric: tabular-nums;
+    }
+    .chip input::placeholder { color: var(--ink-faint); }
+    .chip-label { color: var(--ink-faint); font-weight: 500; }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface);
+      font-size: 11.5px; color: var(--ink-dim);
+    }
+    .status-pill .dot {
+      width: 6px; height: 6px; border-radius: 999px;
+      background: var(--ok);
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+    }
+
+    /* ── Conversation area ───────────────────────────────────────── */
+    .stage { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+    .stage::-webkit-scrollbar { width: 10px; }
+    .stage::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 10px; }
+    .stage::-webkit-scrollbar-thumb:hover { background: #24252a; }
+
+    .stream { max-width: 760px; margin: 0 auto; padding: 24px 24px 140px; }
+
+    /* Empty / splash state */
+    .splash { text-align: center; padding: 80px 20px 40px; }
+    .splash h1 {
+      font-size: 30px; font-weight: 600; letter-spacing: -0.02em;
+      margin: 0 0 10px; color: var(--ink);
+    }
+    .splash p { margin: 0 auto 36px; max-width: 460px; color: var(--ink-dim); }
+    .suggest-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px; max-width: 680px; margin: 0 auto;
+    }
+    .suggest {
+      padding: 14px 16px; text-align: left; cursor: pointer;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--ink-dim);
+      font-size: 13.5px; line-height: 1.45;
+      transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+    .suggest:hover {
+      background: var(--surface-2); border-color: var(--border-strong);
+      color: var(--ink); transform: translateY(-1px);
+    }
+    .suggest .tag {
+      display: inline-block; font-size: 10.5px; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--ink-faint); margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    /* Turns */
+    .turn { margin: 22px 0; }
+    .turn-user { display: flex; justify-content: flex-end; }
+    .bubble-user {
+      max-width: 78%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 14px 14px 4px 14px;
+      font-size: 14.5px;
+      white-space: pre-wrap;
+      color: var(--ink);
+    }
+
+    .turn-agent .answer { color: var(--ink); font-size: 15px; line-height: 1.65; }
+    .turn-agent .answer p { margin: 0 0 12px; }
+    .turn-agent .answer h1, .turn-agent .answer h2, .turn-agent .answer h3 {
+      font-weight: 600; letter-spacing: -0.01em;
+      margin: 18px 0 8px;
+    }
+    .turn-agent .answer h1 { font-size: 20px; }
+    .turn-agent .answer h2 { font-size: 17px; }
+    .turn-agent .answer h3 { font-size: 15px; }
+    .turn-agent .answer ul, .turn-agent .answer ol { padding-left: 22px; margin: 8px 0 14px; }
+    .turn-agent .answer li { margin: 3px 0; }
+    .turn-agent .answer code {
+      font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+      font-size: 12.5px;
+      background: var(--surface-2);
+      padding: 1.5px 6px; border-radius: 5px;
+      border: 1px solid var(--border);
+    }
+    .turn-agent .answer pre {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 12px; border-radius: var(--radius); overflow-x: auto;
+      font-size: 12.5px;
+    }
+    .turn-agent .answer pre code { background: transparent; border: 0; padding: 0; }
+    .turn-agent .answer table { border-collapse: collapse; margin: 8px 0 16px; width: 100%; }
+    .turn-agent .answer th, .turn-agent .answer td {
+      border: 1px solid var(--border); padding: 8px 12px;
+      font-size: 13px; text-align: left;
+    }
+    .turn-agent .answer th { background: var(--surface-2); font-weight: 600; }
+    .turn-agent .answer a { color: var(--accent); text-decoration: none; }
+    .turn-agent .answer a:hover { text-decoration: underline; }
+
+    .agent-meta {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      margin-top: 10px; font-size: 11.5px; color: var(--ink-faint);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .agent-meta .sep { opacity: 0.4; }
+
+    /* Reasoning drawer */
+    details.reasoning {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+    }
+    details.reasoning > summary {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 12.5px; color: var(--ink-dim);
+      list-style: none;
+      display: flex; align-items: center; gap: 10px;
+      user-select: none;
+    }
+    details.reasoning > summary::-webkit-details-marker { display: none; }
+    details.reasoning > summary::before {
+      content: ""; display: inline-block;
+      width: 0; height: 0;
+      border-left: 4px solid var(--ink-faint);
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      transition: transform 150ms ease;
+    }
+    details.reasoning[open] > summary::before { transform: rotate(90deg); }
+    details.reasoning[open] > summary { color: var(--ink); border-bottom: 1px solid var(--border); }
+    .reasoning-body { padding: 10px 14px 14px; }
+
+    .step {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 10px 12px; margin: 6px 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .step .dot {
+      width: 7px; height: 7px; border-radius: 999px;
+      margin-top: 8px; flex-shrink: 0;
+    }
+    .step .dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(74, 222, 128, 0.4); }
+    .step .dot.err { background: var(--err); box-shadow: 0 0 6px rgba(248, 113, 113, 0.4); }
+    .step-head {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 12.5px;
+    }
+    .step-id { font-weight: 600; color: var(--ink); font-family: "JetBrains Mono", monospace; font-size: 12px; }
+    .owner-tag {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      padding: 1px 7px; border-radius: 5px;
+      border: 1px solid var(--border);
+      color: var(--ink-dim);
+      background: var(--bg);
+    }
+    .step-body {
+      margin-top: 5px; font-size: 12.5px; color: var(--ink-dim);
+      white-space: pre-wrap; line-height: 1.5;
+    }
+
+    .plan-json {
+      margin-top: 10px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11.5px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--ink-dim);
+      overflow-x: auto;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .raw-toggle {
+      display: inline-block;
+      margin-top: 10px;
+      font-size: 11.5px; color: var(--ink-faint);
+      cursor: pointer; text-decoration: underline dotted;
+    }
+    .raw-toggle:hover { color: var(--ink-dim); }
+
+    /* Thinking state */
+    .thinking {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--ink-dim); font-size: 14px;
+    }
+    .thinking .shimmer {
+      background: linear-gradient(90deg, var(--ink-faint), var(--ink), var(--ink-faint));
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: shimmer 1.8s linear infinite;
+    }
+    @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+    /* ── Composer ──────────────────────────────────────────────── */
+    .composer-wrap {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 16px 24px 24px;
+      background: linear-gradient(to top, var(--bg) 60%, rgba(10, 10, 11, 0) 100%);
+      pointer-events: none;
+    }
+    .composer {
+      max-width: 760px; margin: 0 auto;
+      pointer-events: auto;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      padding: 10px 10px 10px 14px;
+      display: flex; align-items: flex-end; gap: 8px;
+      transition: border-color 120ms ease;
+    }
+    .composer:focus-within {
+      border-color: rgba(122, 162, 255, 0.5);
+      box-shadow: var(--shadow-md), 0 0 0 3px rgba(122, 162, 255, 0.12);
+    }
+    .composer textarea {
+      flex: 1;
+      background: transparent;
+      border: 0; resize: none; outline: none;
+      color: var(--ink);
+      font: inherit; font-size: 15px;
+      min-height: 24px; max-height: 200px;
+      padding: 8px 0;
+      line-height: 1.5;
+    }
+    .composer textarea::placeholder { color: var(--ink-faint); }
+    .send-btn {
+      flex-shrink: 0;
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--ink); color: var(--bg);
+      border: 0; cursor: pointer;
+      display: grid; place-items: center;
+      transition: background 120ms ease, transform 80ms ease;
+    }
+    .send-btn:hover:not(:disabled) { background: #fff; }
+    .send-btn:active:not(:disabled) { transform: scale(0.96); }
+    .send-btn:disabled {
+      background: var(--surface-2); color: var(--ink-faint);
+      cursor: not-allowed;
+    }
+    .send-btn svg { width: 16px; height: 16px; }
+    .composer-hint {
+      max-width: 760px; margin: 8px auto 0;
+      text-align: center; color: var(--ink-faint);
+      font-size: 11.5px;
+    }
+    .kbd {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 10.5px;
+      padding: 1px 5px; border-radius: 4px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--ink-dim);
+    }
+
+    /* Error bubble */
+    .err-box {
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      background: rgba(248, 113, 113, 0.06);
+      color: #fecaca;
+      padding: 10px 14px; border-radius: var(--radius);
+      font-size: 13px;
+      font-family: "JetBrains Mono", monospace;
+      white-space: pre-wrap; word-break: break-word;
+    }
+
+    @media (max-width: 640px) {
+      .topbar { padding: 12px 16px; }
+      .stream { padding: 16px 16px 140px; }
+      .composer-wrap { padding: 12px 16px 18px; }
+      .splash { padding: 40px 10px 20px; }
+      .splash h1 { font-size: 24px; }
+      .chip input { width: 90px; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Banking Agent <span style="color: var(--accent);">·</span> Demo</h1>
-    <p>Planner → Executor → SQL / RAG / Fraud sub-agents. Each sub-agent speaks a typed JSON contract.</p>
-  </header>
-  <main>
-    <section class="card">
-      <div class="row" style="gap: 8px;">
-        <input id="customer" placeholder="customer_id (optional)" style="max-width: 200px;" />
-        <input id="session" placeholder="session_id (optional)" style="max-width: 200px;" />
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">B</div>
+        <div class="brand-name">Banking Agent</div>
       </div>
-      <div class="row" style="margin-top: 10px;">
-        <textarea id="msg" placeholder="Ask something. e.g. How much did I spend last month?" autofocus></textarea>
+      <div class="topbar-actions">
+        <label class="chip" title="Your credit card / customer identifier">
+          <span class="chip-label">ID</span>
+          <input id="customer" placeholder="cc_num" autocomplete="off" />
+        </label>
+        <span class="status-pill" id="status-pill" title="Service status">
+          <span class="dot"></span>Live
+        </span>
       </div>
-      <div class="row" style="margin-top: 10px; justify-content: flex-end;">
-        <button id="send">Send</button>
-      </div>
-    </section>
+    </header>
 
-    <section id="result-card" class="card" hidden>
-      <div class="meta">
-        <span>trace: <code id="trace">-</code></span>
-        <span>latency: <span id="latency">-</span> ms</span>
-        <span id="status-badge" class="badge">pending</span>
+    <div class="stage" id="stage">
+      <div class="stream" id="stream">
+        <div class="splash" id="splash">
+          <h1>What can I help you with?</h1>
+          <p>Ask about your transactions, CIBC products, or check for suspicious activity. Answers cite the sources and show the steps taken.</p>
+          <div class="suggest-grid">
+            <button class="suggest" data-prompt="How much did I spend last month?">
+              <div class="tag">Spending</div>
+              How much did I spend last month?
+            </button>
+            <button class="suggest" data-prompt="List my spending categories for June 2020 and highlight the five largest transactions.">
+              <div class="tag">Analytics</div>
+              List my spending categories and the five largest transactions.
+            </button>
+            <button class="suggest" data-prompt="Were any of my transactions last year suspicious or fraudulent?">
+              <div class="tag">Fraud</div>
+              Check my recent transactions for fraud risk.
+            </button>
+            <button class="suggest" data-prompt="What does the CIBC Aventura Gold travel insurance certificate cover?">
+              <div class="tag">Policies</div>
+              What does the Aventura Gold travel insurance cover?
+            </button>
+          </div>
+        </div>
       </div>
-      <details id="plan-details">
-        <summary>Plan (planner output)</summary>
-        <pre id="plan">(none)</pre>
-      </details>
-      <details>
-        <summary>Step results</summary>
-        <div id="steps"></div>
-      </details>
-      <h3 style="margin: 14px 0 6px;">Final answer</h3>
-      <div id="answer" class="answer"></div>
-    </section>
+    </div>
 
-    <section id="empty" class="card empty">
-      Ask a question above. The agent will plan, dispatch to sub-agents, and synthesise the final answer.
-    </section>
-  </main>
-  <footer>
-    <a style="color: var(--accent);" href="/healthz">/healthz</a> · Banking Agent modular monolith
-  </footer>
+    <div class="composer-wrap">
+      <form class="composer" id="composer" autocomplete="off">
+        <textarea
+          id="msg"
+          rows="1"
+          placeholder="Ask anything about your accounts or CIBC products..."
+          autofocus
+        ></textarea>
+        <button type="submit" class="send-btn" id="send" aria-label="Send">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.5 8H13.5M13.5 8L9 3.5M13.5 8L9 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </form>
+      <div class="composer-hint">
+        <span class="kbd">Enter</span> to send · <span class="kbd">Shift</span> + <span class="kbd">Enter</span> for newline
+      </div>
+    </div>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
-    const btn = $("send");
+    const stage = $("stage");
+    const stream = $("stream");
+    const splash = $("splash");
+    const composer = $("composer");
     const msg = $("msg");
+    const send = $("send");
 
-    btn.addEventListener("click", send);
+    // Persist customer id locally so reloads don't lose it
+    const LS_KEY = "bank_agent.customer_id";
+    const savedId = localStorage.getItem(LS_KEY);
+    if (savedId) $("customer").value = savedId;
+    $("customer").addEventListener("input", () => localStorage.setItem(LS_KEY, $("customer").value));
+
+    // One session id per page load so conversational memory stays consistent across turns.
+    const sessionId = (crypto.randomUUID && crypto.randomUUID()) ||
+      "s-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+    // Auto-grow textarea
+    function autogrow() {
+      msg.style.height = "auto";
+      msg.style.height = Math.min(msg.scrollHeight, 200) + "px";
+    }
+    msg.addEventListener("input", autogrow);
+
+    // Submit on Enter (not Shift+Enter)
     msg.addEventListener("keydown", (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send();
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        composer.dispatchEvent(new Event("submit", { cancelable: true }));
+      }
     });
 
-    async function send() {
+    // Suggestion buttons
+    document.querySelectorAll(".suggest").forEach((el) => {
+      el.addEventListener("click", () => {
+        msg.value = el.dataset.prompt;
+        autogrow();
+        msg.focus();
+      });
+    });
+
+    composer.addEventListener("submit", async (e) => {
+      e.preventDefault();
       const text = msg.value.trim();
-      if (!text) return;
-      btn.disabled = true;
-      btn.textContent = "Running...";
-      $("empty").hidden = true;
-      $("result-card").hidden = false;
-      $("answer").innerHTML = '<span class="muted">Planning and executing... cold start may take 10–15s on the first request.</span>';
-      $("plan").textContent = "(running)";
-      $("steps").innerHTML = "";
-      $("trace").textContent = "-";
-      $("latency").textContent = "-";
-      const badge = $("status-badge");
-      badge.className = "badge"; badge.textContent = "running";
+      if (!text || send.disabled) return;
+
+      if (splash) splash.remove();
+
+      renderUserTurn(text);
+      const agentTurn = renderAgentThinking();
+
+      msg.value = "";
+      autogrow();
+      send.disabled = true;
+
       try {
         const r = await fetch("/api/chat", {
           method: "POST",
@@ -133,51 +490,120 @@
           body: JSON.stringify({
             message: text,
             customer_id: $("customer").value || "",
-            session_id: $("session").value || "",
+            session_id: sessionId,
           }),
         });
         const j = await r.json();
-        $("trace").textContent = j.trace_id || "-";
-        $("latency").textContent = j.latency_ms ?? "-";
         if (j.error) {
-          badge.className = "badge err"; badge.textContent = "error";
-          $("answer").innerHTML = '<pre style="color: var(--err);">' + escapeHtml(j.error) + '</pre>';
-          return;
+          renderAgentError(agentTurn, j);
+        } else {
+          renderAgentAnswer(agentTurn, j);
         }
-        badge.className = "badge ok"; badge.textContent = "ok";
-        $("plan").textContent = j.plan ? JSON.stringify(j.plan, null, 2) : "(no plan)";
-        renderSteps(j.step_results || {});
-        const md = j.final_answer || "(no final answer)";
-        $("answer").innerHTML = window.marked ? window.marked.parse(md) : escapeHtml(md);
-      } catch (e) {
-        badge.className = "badge err"; badge.textContent = "error";
-        $("answer").innerHTML = '<pre style="color: var(--err);">' + escapeHtml(String(e)) + '</pre>';
+      } catch (err) {
+        renderAgentError(agentTurn, { error: String(err), trace_id: "-", latency_ms: 0 });
       } finally {
-        btn.disabled = false;
-        btn.textContent = "Send";
+        send.disabled = false;
+        msg.focus();
       }
+    });
+
+    function renderUserTurn(text) {
+      const div = document.createElement("div");
+      div.className = "turn turn-user";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble-user";
+      bubble.textContent = text;
+      div.appendChild(bubble);
+      stream.appendChild(div);
+      scrollToBottom();
     }
 
-    function renderSteps(stepResults) {
-      const container = $("steps");
-      container.innerHTML = "";
+    function renderAgentThinking() {
+      const div = document.createElement("div");
+      div.className = "turn turn-agent";
+      div.innerHTML = '<div class="thinking"><span class="shimmer">Thinking…</span></div>';
+      stream.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    function renderAgentAnswer(turnEl, j) {
+      const md = j.final_answer || "*(no answer was generated)*";
+      const answerHtml = window.marked ? window.marked.parse(md) : escapeHtml(md);
+      const stepCount = Object.keys(j.step_results || {}).length;
+      const secs = (j.latency_ms / 1000).toFixed(1);
+
+      const planText = j.plan ? JSON.stringify(j.plan, null, 2) : "";
+      const stepsHtml = buildStepsHtml(j.step_results || {});
+      const hasReasoning = stepCount > 0 || !!j.plan;
+
+      turnEl.innerHTML =
+        '<div class="answer">' + answerHtml + '</div>' +
+        (hasReasoning ? (
+          '<details class="reasoning">' +
+            '<summary>Reasoning · ' + stepCount + ' step' + (stepCount === 1 ? '' : 's') + ' · ' + secs + 's</summary>' +
+            '<div class="reasoning-body">' +
+              stepsHtml +
+              (planText ? (
+                '<span class="raw-toggle" data-toggle="plan">Show plan (JSON)</span>' +
+                '<pre class="plan-json" hidden>' + escapeHtml(planText) + '</pre>'
+              ) : '') +
+            '</div>' +
+          '</details>'
+        ) : '') +
+        '<div class="agent-meta">' +
+          '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
+          '<span class="sep">·</span>' +
+          '<span>' + secs + 's</span>' +
+        '</div>';
+
+      turnEl.querySelectorAll(".raw-toggle").forEach((el) => {
+        el.addEventListener("click", () => {
+          const pre = el.nextElementSibling;
+          if (!pre) return;
+          const open = !pre.hasAttribute("hidden");
+          if (open) { pre.setAttribute("hidden", ""); el.textContent = "Show plan (JSON)"; }
+          else { pre.removeAttribute("hidden"); el.textContent = "Hide plan"; }
+        });
+      });
+
+      scrollToBottom();
+    }
+
+    function buildStepsHtml(stepResults) {
       const entries = Object.entries(stepResults || {});
-      if (entries.length === 0) {
-        container.innerHTML = '<p class="muted">(no sub-agent steps executed)</p>';
-        return;
-      }
-      for (const [sid, sr] of entries) {
-        const div = document.createElement("div");
-        div.className = "step";
-        const isOk = (sr && sr.status) === "ok";
+      if (entries.length === 0) return '';
+      return entries.map(([sid, sr]) => {
+        const ok = (sr && sr.status) === "ok";
+        const owner = (sr && sr.owner) || "";
         const summary = (sr && sr.data && sr.data.summary) || (sr && sr.error_message) || "";
-        div.innerHTML =
-          '<div class="step-head"><span class="status-dot ' + (isOk ? "ok" : "err") + '"></span>' +
-          '<strong>' + escapeHtml(sid) + '</strong> · ' +
-          '<span class="muted">' + escapeHtml((sr && sr.owner) || "") + '</span></div>' +
-          '<div class="step-body">' + escapeHtml(summary) + '</div>';
-        container.appendChild(div);
-      }
+        return (
+          '<div class="step">' +
+            '<span class="dot ' + (ok ? 'ok' : 'err') + '"></span>' +
+            '<div style="flex:1; min-width:0;">' +
+              '<div class="step-head">' +
+                '<span class="step-id">' + escapeHtml(sid) + '</span>' +
+                (owner ? '<span class="owner-tag">' + escapeHtml(owner) + '</span>' : '') +
+              '</div>' +
+              '<div class="step-body">' + escapeHtml(summary || '(no summary)') + '</div>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderAgentError(turnEl, j) {
+      turnEl.innerHTML =
+        '<div class="err-box">' + escapeHtml(j.error || "Something went wrong.") + '</div>' +
+        '<div class="agent-meta">' +
+          '<span>trace ' + escapeHtml(j.trace_id || '-') + '</span>' +
+          (j.latency_ms ? '<span class="sep">·</span><span>' + (j.latency_ms / 1000).toFixed(1) + 's</span>' : '') +
+        '</div>';
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      requestAnimationFrame(() => { stage.scrollTop = stage.scrollHeight; });
     }
 
     function escapeHtml(s) {

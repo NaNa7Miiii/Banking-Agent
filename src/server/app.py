@@ -4,7 +4,7 @@ FastAPI layer for the Banking Agent.
 Exposes:
   * ``GET  /healthz``            — Railway / load-balancer health probe.
   * ``POST /api/chat``           — Run one planner→executor→aggregate turn.
-  * ``GET  /``                   — Serves ``src/server/static/index.html`` (demo UI).
+  * ``GET  /``                   — Serves the conversational web UI from ``src/server/static/``.
 
 Design notes:
   * The runtime graph is **not** constructed at import time. We build it lazily on
@@ -137,7 +137,7 @@ def chat(req: ChatRequest) -> ChatResponse:
 if _STATIC_DIR.exists():
     app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
 else:
-    logger.warning("static dir not found at %s; demo UI unavailable", _STATIC_DIR, extra={"trace_id": "-"})
+    logger.warning("static dir not found at %s; web UI unavailable", _STATIC_DIR, extra={"trace_id": "-"})
 
 
 if __name__ == "__main__":  # pragma: no cover
