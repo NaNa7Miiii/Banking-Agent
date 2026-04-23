@@ -10,7 +10,7 @@ from typing import Any
 from src.graph.runtime_state import RuntimeState
 from src.models.llm import get_llm
 from src.utils.prompt_loader import load_system_prompt
-from src.graph.executor.router import get_canonical
+from src.graph.executor.router import get_canonical, canonical_owners
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,39 @@ def _normalize_replan_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]
         s["owner"] = get_canonical(s.get("owner") or "")
         out.append(s)
     return out
+
+
+def _prune_illegal_owner_new_steps(new_steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Defense-in-depth mirror of planner._prune_illegal_owner_steps: drop any new
+    replan step whose owner isn't a registered sub-agent and scrub dangling
+    depends_on references in the kept steps. Dependencies on previously
+    completed steps (original plan ids) are untouched.
+    """
+    legal = canonical_owners()
+    kept: list[dict[str, Any]] = []
+    dropped_ids: set[str] = set()
+    for step in new_steps:
+        if step.get("owner") in legal:
+            kept.append(step)
+        else:
+            sid = (step.get("id") or "").strip()
+            if sid:
+                dropped_ids.add(sid)
+            logger.warning(
+                "Replan emitted step %s with unsupported owner %r; dropping. Legal owners: %s",
+                step.get("id"),
+                step.get("owner"),
+                sorted(legal),
+            )
+    if not dropped_ids:
+        return kept
+    for step in kept:
+        step["depends_on"] = [
+            d for d in (step.get("depends_on") or [])
+            if _extract_dep_step_id(d) not in dropped_ids
+        ]
+    return kept
 
 
 def _call_replan_llm(user_message: str) -> dict[str, Any]:
@@ -226,6 +259,16 @@ def maybe_replan_node(state: RuntimeState) -> RuntimeState:
 
     new_steps = new_plan.get("steps") or []
     new_steps = _normalize_replan_steps(new_steps)
+    # Defense-in-depth: the replan LLM sometimes emits owners like
+    # `banking_assistant` or `main` for summarization; the executor rejects
+    # them. Drop these here, scrub dangling depends_on in the survivors, and
+    # bail gracefully if nothing runnable remains.
+    new_steps = _prune_illegal_owner_new_steps(new_steps)
+    if not new_steps:
+        logger.warning(
+            "Replan produced no steps with legal owners; skipping this replan attempt."
+        )
+        return {"replan_count": current_replan_count}
     # P0-3: completed steps cannot be overwritten; rename new steps that conflict with completed ids
     new_steps = _resolve_replan_step_id_conflicts(new_steps, completed_step_ids, current_replan_count + 1)
 
