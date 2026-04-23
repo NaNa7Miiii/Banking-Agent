@@ -159,6 +159,44 @@ def healthz_redis() -> dict[str, Any]:
         }
 
 
+@app.get("/healthz/langfuse")
+def healthz_langfuse() -> dict[str, Any]:
+    """
+    Readiness probe for Langfuse tracing. Returns:
+      - ``{"status": "ok", "host", "public_key_prefix"}`` — env vars present and
+        the SDK can instantiate a client (project keys are valid format-wise).
+      - ``{"status": "unconfigured", "reason": ...}`` — env vars missing.
+      - ``{"status": "error", "reason": ...}`` — SDK raised on init.
+    """
+    public_key = os.environ.get("LANGFUSE_PUBLIC_KEY") or ""
+    secret_key = os.environ.get("LANGFUSE_SECRET_KEY") or ""
+    host = os.environ.get("LANGFUSE_HOST") or "https://cloud.langfuse.com"
+    if not public_key or not secret_key:
+        return {
+            "status": "unconfigured",
+            "reason": "LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY not set; tracing disabled.",
+        }
+    try:
+        from langfuse import get_client
+        client = get_client()
+        # Force the client to initialize (SDK lazily builds the HTTP pool); any
+        # misconfigured secret / host surfaces as an exception here.
+        _ = client
+        return {
+            "status": "ok",
+            "host": host,
+            "public_key_prefix": public_key[:12] + "…",
+        }
+    except Exception as exc:
+        logger.warning("healthz_langfuse: init failed: %s", exc)
+        return {
+            "status": "error",
+            "host": host,
+            "public_key_prefix": public_key[:12] + "…",
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
     trace_id = uuid.uuid4().hex[:12]
